@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 # 1. Web UI (React + Vite)
-FROM --platform=$BUILDPLATFORM node:22-alpine AS web
+FROM --platform=$BUILDPLATFORM node:25-alpine AS web
 WORKDIR /src
 COPY package.json package-lock.json tsconfig.base.json ./
 COPY web/package.json web/
