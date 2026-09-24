@@ -1,4 +1,4 @@
-import { Mailpeek, MailpeekError } from "@mailpeek/client";
+import { Mailpeek, MailpeekError } from "@mailpeek-dev/client";
 import { expect, test } from "@playwright/test";
 import nodemailer from "nodemailer";
 import { liveEvents } from "./live";

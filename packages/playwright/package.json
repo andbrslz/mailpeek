@@ -1,5 +1,5 @@
 {
-  "name": "@mailpeek/playwright",
+  "name": "@mailpeek-dev/playwright",
   "version": "0.1.0",
   "description": "Playwright fixture for Mailpeek: isolated inboxes and waitFor() for email tests.",
   "license": "MIT",
@@ -14,7 +14,7 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/OWNER/mailpeek.git",
+    "url": "git+https://github.com/andbrslz/mailpeek.git",
     "directory": "packages/playwright"
   },
   "exports": {
@@ -44,7 +44,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@mailpeek/client": "^0.1.0"
+    "@mailpeek-dev/client": "^0.1.0"
   },
   "peerDependencies": {
     "@playwright/test": ">=1.40.0"

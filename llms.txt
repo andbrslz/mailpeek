@@ -110,6 +110,6 @@ In Docker use the same port inside and outside: `-e MAILPEEK_SMTP_PORT=1027 -p 1
 ## Docs
 
 - [README](https://github.com/mailpeek/mailpeek/blob/main/README.md): full guide
-- [Playwright quick start](https://github.com/mailpeek/mailpeek/blob/main/README.md#playwright-quick-start): `@mailpeek/playwright` fixture with per-test inboxes
-- [TypeScript client](https://github.com/mailpeek/mailpeek/blob/main/README.md#typescript-client-vitest-jest-scripts): `@mailpeek/client` for Vitest, Jest and scripts
+- [Playwright quick start](https://github.com/mailpeek/mailpeek/blob/main/README.md#playwright-quick-start): `@mailpeek-dev/playwright` fixture with per-test inboxes
+- [TypeScript client](https://github.com/mailpeek/mailpeek/blob/main/README.md#typescript-client-vitest-jest-scripts): `@mailpeek-dev/client` for Vitest, Jest and scripts
 - [CI](https://github.com/mailpeek/mailpeek/blob/main/README.md#ci): GitHub Actions and Docker Compose setups

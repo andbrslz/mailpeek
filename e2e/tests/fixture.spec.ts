@@ -1,4 +1,4 @@
-import { expect, MailpeekTimeoutError, test } from "@mailpeek/playwright";
+import { expect, MailpeekTimeoutError, test } from "@mailpeek-dev/playwright";
 import { sendMail, welcomeHtml } from "./smtp";
 
 // These run in parallel across 4 workers: each test must only ever see its

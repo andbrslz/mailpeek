@@ -1,4 +1,4 @@
-import { Mailpeek } from "@mailpeek/client";
+import { Mailpeek } from "@mailpeek-dev/client";
 import { expect, test } from "@playwright/test";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";

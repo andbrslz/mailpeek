@@ -134,11 +134,11 @@ Requires Go 1.25+ and Node 20.19+.
 ## Playwright quick start
 
 ```bash
-npm install -D @mailpeek/playwright
+npm install -D @mailpeek-dev/playwright
 ```
 
 ```ts
-import { test, expect } from "@mailpeek/playwright";
+import { test, expect } from "@mailpeek-dev/playwright";
 
 test("welcome email", async ({ page, mail }) => {
   const inbox = mail.createInbox();
@@ -156,7 +156,7 @@ test("welcome email", async ({ page, mail }) => {
 The `mail` fixture talks to `MAILPEEK_URL` (default `http://localhost:8026`). You can also set it in `playwright.config.ts`:
 
 ```ts
-import type { MailpeekTestOptions } from "@mailpeek/playwright";
+import type { MailpeekTestOptions } from "@mailpeek-dev/playwright";
 import { defineConfig } from "@playwright/test";
 
 export default defineConfig<MailpeekTestOptions>({
@@ -268,7 +268,7 @@ export default defineConfig<MailpeekTestOptions>({
 ### Start Mailpeek with the suite
 
 ```ts
-import { mailpeekWebServer } from "@mailpeek/playwright";
+import { mailpeekWebServer } from "@mailpeek-dev/playwright";
 
 export default defineConfig({
   webServer: [
@@ -285,11 +285,11 @@ Options: `smtpPort`, `httpPort`, `binary` (use a local `mailpeek` instead of Doc
 ## TypeScript client (Vitest, Jest, scripts)
 
 ```bash
-npm install -D @mailpeek/client
+npm install -D @mailpeek-dev/client
 ```
 
 ```ts
-import { Mailpeek } from "@mailpeek/client";
+import { Mailpeek } from "@mailpeek-dev/client";
 
 const mailpeek = new Mailpeek({ baseUrl: "http://localhost:8026" });
 
@@ -604,8 +604,8 @@ internal/events     in-memory pub/sub broker
 internal/api        REST, wait API, SSE, embedded UI
 internal/app        wiring and graceful shutdown
 web/                React + Vite + Tailwind UI (embedded with go:embed)
-packages/client     @mailpeek/client
-packages/playwright @mailpeek/playwright
+packages/client     @mailpeek-dev/client
+packages/playwright @mailpeek-dev/playwright
 e2e/                Playwright suite for Mailpeek itself
 examples/           Playwright project with a demo app; Docker Compose
 scripts/            maintenance scripts (documentation screenshots)

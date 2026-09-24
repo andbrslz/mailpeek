@@ -7,5 +7,5 @@ export default defineConfig({
   dts: { compilerOptions: { ignoreDeprecations: "6.0" } },
   clean: true,
   target: "es2022",
-  external: ["@playwright/test", "@mailpeek/client"],
+  external: ["@playwright/test", "@mailpeek-dev/client"],
 });

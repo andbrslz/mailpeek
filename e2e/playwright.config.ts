@@ -1,4 +1,4 @@
-import type { MailpeekTestOptions } from "@mailpeek/playwright";
+import type { MailpeekTestOptions } from "@mailpeek-dev/playwright";
 import { defineConfig, devices } from "@playwright/test";
 import {
   authHttpPort,

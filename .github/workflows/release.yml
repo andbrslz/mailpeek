@@ -84,9 +84,24 @@ jobs:
         with:
           node-version: 22
           registry-url: https://registry.npmjs.org
+      - name: Tag matches package versions
+        run: |
+          for pkg in packages/client packages/playwright; do
+            version=$(node -p "require('./$pkg/package.json').version")
+            [ "v$version" = "$GITHUB_REF_NAME" ] || { echo "$pkg is $version, tag is $GITHUB_REF_NAME"; exit 1; }
+          done
+      - run: npm install -g npm@latest
       - run: npm ci
-      - run: npm run build -w @mailpeek/client -w @mailpeek/playwright
-      - run: npm test -w @mailpeek/client
-      - run: npm publish --provenance --access public -w @mailpeek/client -w @mailpeek/playwright
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      - run: npm run build -w @mailpeek-dev/client -w @mailpeek-dev/playwright
+      - run: npm test -w @mailpeek-dev/client
+      - name: Publish (trusted publishing, skips versions already on npm)
+        run: |
+          for pkg in client playwright; do
+            name="@mailpeek-dev/$pkg"
+            version=$(node -p "require('./packages/$pkg/package.json').version")
+            if npm view "$name@$version" version >/dev/null 2>&1; then
+              echo "$name@$version already published"
+            else
+              npm publish --provenance --access public -w "$name"
+            fi
+          done

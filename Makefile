@@ -18,7 +18,7 @@ web: node_modules
 	npm run build -w @mailpeek/web
 
 packages: node_modules
-	npm run build -w @mailpeek/client -w @mailpeek/playwright
+	npm run build -w @mailpeek-dev/client -w @mailpeek-dev/playwright
 
 ## run: build and start Mailpeek
 run: build

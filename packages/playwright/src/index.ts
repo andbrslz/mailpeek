@@ -7,7 +7,7 @@ import {
   type MessageFilter,
   type MessageSummary,
   type WaitOptions,
-} from "@mailpeek/client";
+} from "@mailpeek-dev/client";
 
 /** The `mail` fixture available in every test. */
 export interface MailFixture {
@@ -155,4 +155,4 @@ async function attachEmails(testInfo: TestInfo, mailpeek: Mailpeek, inboxes: Inb
 
 export { mailpeekWebServer, type MailpeekWebServerOptions } from "./server.js";
 export { expect };
-export * from "@mailpeek/client";
+export * from "@mailpeek-dev/client";

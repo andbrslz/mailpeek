@@ -1,4 +1,4 @@
-import { mailpeekWebServer, type MailpeekTestOptions } from "@mailpeek/playwright";
+import { mailpeekWebServer, type MailpeekTestOptions } from "@mailpeek-dev/playwright";
 import { defineConfig, devices } from "@playwright/test";
 
 // Mailpeek is started with the suite (Docker by default; set MAILPEEK_BINARY to

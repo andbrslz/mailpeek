@@ -1,4 +1,4 @@
-import { expect, test } from "@mailpeek/playwright";
+import { expect, test } from "@mailpeek-dev/playwright";
 
 test("user receives welcome email", async ({ page, mail }) => {
   const inbox = mail.createInbox();

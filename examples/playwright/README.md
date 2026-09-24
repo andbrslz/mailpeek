@@ -1,6 +1,6 @@
 # Playwright example
 
-A tiny demo app (`app/server.js`) that sends real emails over SMTP (registration with an activation link, and password reset), tested with `@mailpeek/playwright`.
+A tiny demo app (`app/server.js`) that sends real emails over SMTP (registration with an activation link, and password reset), tested with `@mailpeek-dev/playwright`.
 
 ```bash
 # from the repository root

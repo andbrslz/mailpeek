@@ -1,4 +1,4 @@
-import type { MailpeekTestOptions } from "@mailpeek/playwright";
+import type { MailpeekTestOptions } from "@mailpeek-dev/playwright";
 import { defineConfig } from "@playwright/test";
 
 // Used by attachments.spec.ts: runs a deliberately failing test to check the

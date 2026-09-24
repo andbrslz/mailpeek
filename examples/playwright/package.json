@@ -11,7 +11,7 @@
     "nodemailer": "^10.0.10"
   },
   "devDependencies": {
-    "@mailpeek/playwright": "^0.1.0",
+    "@mailpeek-dev/playwright": "^0.1.0",
     "@playwright/test": "^1.63.0"
   }
 }

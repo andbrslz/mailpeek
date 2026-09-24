@@ -1,5 +1,5 @@
 {
-  "name": "@mailpeek/client",
+  "name": "@mailpeek-dev/client",
   "version": "0.1.0",
   "description": "TypeScript client for Mailpeek: wait for, inspect and assert on emails in tests.",
   "license": "MIT",
@@ -13,7 +13,7 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/OWNER/mailpeek.git",
+    "url": "git+https://github.com/andbrslz/mailpeek.git",
     "directory": "packages/client"
   },
   "exports": {

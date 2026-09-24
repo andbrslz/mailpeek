@@ -10,7 +10,7 @@
     "examples/playwright"
   ],
   "scripts": {
-    "build": "npm run build -w @mailpeek/client -w @mailpeek/playwright -w @mailpeek/web",
+    "build": "npm run build -w @mailpeek-dev/client -w @mailpeek-dev/playwright -w @mailpeek/web",
     "lint": "eslint . && prettier --check .",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",

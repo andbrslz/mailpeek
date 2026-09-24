@@ -1,4 +1,4 @@
-import { Mailpeek } from "@mailpeek/client";
+import { Mailpeek } from "@mailpeek-dev/client";
 import { expect, test } from "@playwright/test";
 import { httpPort } from "./ports";
 import { sendMail } from "./smtp";

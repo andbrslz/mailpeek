@@ -1,4 +1,4 @@
-import { expect, test } from "@mailpeek/playwright";
+import { expect, test } from "@mailpeek-dev/playwright";
 import { logoPng, sendMail } from "./smtp";
 
 test("the search finds text in the email body", async ({ page, mail }) => {

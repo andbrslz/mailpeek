@@ -1,4 +1,4 @@
-import { expect, test } from "@mailpeek/playwright";
+import { expect, test } from "@mailpeek-dev/playwright";
 import nodemailer from "nodemailer";
 
 test("fails after receiving an email", async ({ mail }) => {

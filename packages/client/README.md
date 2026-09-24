@@ -1,13 +1,13 @@
-# @mailpeek/client
+# @mailpeek-dev/client
 
-TypeScript client for [Mailpeek](https://github.com/OWNER/mailpeek): wait for, inspect and assert on emails in Vitest, Jest, Playwright or plain scripts.
+TypeScript client for [Mailpeek](https://github.com/andbrslz/mailpeek): wait for, inspect and assert on emails in Vitest, Jest, Playwright or plain scripts.
 
 ```bash
-npm install -D @mailpeek/client
+npm install -D @mailpeek-dev/client
 ```
 
 ```ts
-import { Mailpeek } from "@mailpeek/client";
+import { Mailpeek } from "@mailpeek-dev/client";
 
 const mailpeek = new Mailpeek(); // MAILPEEK_URL or http://localhost:8026
 

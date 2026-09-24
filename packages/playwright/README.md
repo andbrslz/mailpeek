@@ -1,13 +1,13 @@
-# @mailpeek/playwright
+# @mailpeek-dev/playwright
 
-Playwright fixture for [Mailpeek](https://github.com/OWNER/mailpeek): an isolated inbox per test and `waitFor()` for emails.
+Playwright fixture for [Mailpeek](https://github.com/andbrslz/mailpeek): an isolated inbox per test and `waitFor()` for emails.
 
 ```bash
-npm install -D @mailpeek/playwright
+npm install -D @mailpeek-dev/playwright
 ```
 
 ```ts
-import { test, expect } from "@mailpeek/playwright";
+import { test, expect } from "@mailpeek-dev/playwright";
 
 test("password reset", async ({ page, mail }) => {
   const inbox = mail.createInbox();
@@ -30,7 +30,7 @@ test("password reset", async ({ page, mail }) => {
 | --- | --- |
 | `createInbox(options?)` | Unique inbox for this test (`test-<random>@mailpeek.local`), matched exactly. Recommended for parallel runs. |
 | `workerInbox()` | Inbox shared by the current worker (`worker-<index>-<random>@mailpeek.local`). |
-| `messages()`, `latest()`, `waitFor()`, `waitForEmails()`, `get()`, `delete()`, `clear()` | Same as `@mailpeek/client`. |
+| `messages()`, `latest()`, `waitFor()`, `waitForEmails()`, `get()`, `delete()`, `clear()` | Same as `@mailpeek-dev/client`. |
 | `client` | The underlying `Mailpeek` instance. |
 
 Inbox: `address`, `messages()`, `latest()`, `waitForEmail(options?)`, `waitForEmails(count, options?)`, `failNext(options?)`, `clear()`.
@@ -49,7 +49,7 @@ The fixture attaches, for each inbox the test used, a JSON summary and the newes
 ## Start Mailpeek with the suite
 
 ```ts
-import { mailpeekWebServer } from "@mailpeek/playwright";
+import { mailpeekWebServer } from "@mailpeek-dev/playwright";
 
 export default defineConfig({
   webServer: [mailpeekWebServer(), { command: "npm run dev", url: "http://localhost:3000" }],
@@ -63,7 +63,7 @@ Options: `smtpPort` (1026), `httpPort` (8026), `binary` (a local `mailpeek` inst
 The Mailpeek URL comes from `MAILPEEK_URL` (default `http://localhost:8026`), or from the `mailpeekUrl` option. If Mailpeek runs with `--ui-auth`, include the credentials: `http://admin:secret@localhost:8026`.
 
 ```ts
-import type { MailpeekTestOptions } from "@mailpeek/playwright";
+import type { MailpeekTestOptions } from "@mailpeek-dev/playwright";
 import { defineConfig } from "@playwright/test";
 
 export default defineConfig<MailpeekTestOptions>({
@@ -71,4 +71,4 @@ export default defineConfig<MailpeekTestOptions>({
 });
 ```
 
-`test` and `expect` are Playwright's, extended with the fixture. Everything from `@mailpeek/client` is re-exported.
+`test` and `expect` are Playwright's, extended with the fixture. Everything from `@mailpeek-dev/client` is re-exported.
