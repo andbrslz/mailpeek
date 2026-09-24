@@ -9,7 +9,7 @@ Defaults: SMTP on port 1026, Web UI and API on http://localhost:8026. The binary
 Docker:
 
 ```bash
-docker run -d --name mailpeek -p 1026:1026 -p 8026:8026 mailpeek/mailpeek
+docker run -d --name mailpeek -p 1026:1026 -p 8026:8026 4ndbrslz/mailpeek
 ```
 
 Docker Compose, next to the application (the app reaches it as host `mailpeek`, not `localhost`):
@@ -17,21 +17,21 @@ Docker Compose, next to the application (the app reaches it as host `mailpeek`, 
 ```yaml
 services:
   mailpeek:
-    image: mailpeek/mailpeek
+    image: 4ndbrslz/mailpeek
     ports: ["1026:1026", "8026:8026"]
 ```
 
 Binary on Linux or macOS (detects OS/architecture, verifies the SHA-256 checksum, installs to /usr/local/bin or ~/.local/bin):
 
 ```bash
-curl -fsSL https://github.com/mailpeek/mailpeek/releases/latest/download/install.sh | sh
+curl -fsSL https://github.com/andbrslz/mailpeek/releases/latest/download/install.sh | sh
 mailpeek
 ```
 
 Binary on Windows (PowerShell):
 
 ```powershell
-Invoke-WebRequest https://github.com/mailpeek/mailpeek/releases/latest/download/mailpeek-windows-amd64.exe -OutFile mailpeek.exe
+Invoke-WebRequest https://github.com/andbrslz/mailpeek/releases/latest/download/mailpeek-windows-amd64.exe -OutFile mailpeek.exe
 .\mailpeek.exe
 ```
 
@@ -109,7 +109,7 @@ In Docker use the same port inside and outside: `-e MAILPEEK_SMTP_PORT=1027 -p 1
 
 ## Docs
 
-- [README](https://github.com/mailpeek/mailpeek/blob/main/README.md): full guide
-- [Playwright quick start](https://github.com/mailpeek/mailpeek/blob/main/README.md#playwright-quick-start): `@mailpeek-dev/playwright` fixture with per-test inboxes
-- [TypeScript client](https://github.com/mailpeek/mailpeek/blob/main/README.md#typescript-client-vitest-jest-scripts): `@mailpeek-dev/client` for Vitest, Jest and scripts
-- [CI](https://github.com/mailpeek/mailpeek/blob/main/README.md#ci): GitHub Actions and Docker Compose setups
+- [README](https://github.com/andbrslz/mailpeek/blob/master/README.md): full guide
+- [Playwright quick start](https://github.com/andbrslz/mailpeek/blob/master/README.md#playwright-quick-start): `@mailpeek-dev/playwright` fixture with per-test inboxes
+- [TypeScript client](https://github.com/andbrslz/mailpeek/blob/master/README.md#typescript-client-vitest-jest-scripts): `@mailpeek-dev/client` for Vitest, Jest and scripts
+- [CI](https://github.com/andbrslz/mailpeek/blob/master/README.md#ci): GitHub Actions and Docker Compose setups

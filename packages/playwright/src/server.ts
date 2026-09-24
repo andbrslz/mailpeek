@@ -3,7 +3,7 @@ export interface MailpeekWebServerOptions {
   smtpPort?: number;
   /** Web UI / API port (default 8026). */
   httpPort?: number;
-  /** Docker image (default mailpeek/mailpeek). Ignored when `binary` is set. */
+  /** Docker image (default 4ndbrslz/mailpeek). Ignored when `binary` is set. */
   image?: string;
   /** Run a local binary instead of Docker, e.g. "./bin/mailpeek" or "mailpeek". */
   binary?: string;
@@ -34,7 +34,7 @@ export function mailpeekWebServer(options: MailpeekWebServerOptions = {}) {
   const command = options.binary
     ? `${options.binary} ${flags}`
     : `docker run --rm -p ${smtpPort}:${smtpPort} -p ${httpPort}:${httpPort} ` +
-      `${options.image ?? "mailpeek/mailpeek"} ${flags}`;
+      `${options.image ?? "4ndbrslz/mailpeek"} ${flags}`;
   return {
     command,
     url: `http://localhost:${httpPort}/api/v1/health`,

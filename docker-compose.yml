@@ -1,5 +1,5 @@
 # Build and run Mailpeek from this checkout: docker compose up --build
-# (To use the published image instead: image: mailpeek/mailpeek)
+# (To use the published image instead: image: 4ndbrslz/mailpeek)
 #
 # Defaults are 1026/8026, so Mailpit or MailHog (1025/8025) can run alongside.
 # Other ports:

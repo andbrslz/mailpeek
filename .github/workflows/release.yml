@@ -30,7 +30,7 @@ jobs:
         uses: docker/metadata-action@v6
         with:
           images: |
-            mailpeek/mailpeek
+            4ndbrslz/mailpeek
             ghcr.io/${{ github.repository_owner }}/mailpeek
           tags: |
             type=semver,pattern={{version}}

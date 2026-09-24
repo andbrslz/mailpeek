@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 
-repo="${MAILPEEK_REPO:-mailpeek/mailpeek}"
+repo="${MAILPEEK_REPO:-andbrslz/mailpeek}"
 version="${MAILPEEK_VERSION:-latest}"
 base="${MAILPEEK_DOWNLOAD_URL:-}"
 if [ -z "$base" ]; then
@@ -20,12 +20,12 @@ fail() {
 case "$(uname -s)" in
   Linux) os=linux ;;
   Darwin) os=darwin ;;
-  *) fail "unsupported system $(uname -s). On Windows download $base/mailpeek-windows-amd64.exe, or use the Docker image mailpeek/mailpeek" ;;
+  *) fail "unsupported system $(uname -s). On Windows download $base/mailpeek-windows-amd64.exe, or use the Docker image 4ndbrslz/mailpeek" ;;
 esac
 case "$(uname -m)" in
   x86_64 | amd64) arch=amd64 ;;
   arm64 | aarch64) arch=arm64 ;;
-  *) fail "unsupported architecture $(uname -m); use the Docker image mailpeek/mailpeek" ;;
+  *) fail "unsupported architecture $(uname -m); use the Docker image 4ndbrslz/mailpeek" ;;
 esac
 asset="mailpeek-$os-$arch"
 

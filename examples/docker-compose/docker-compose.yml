@@ -10,7 +10,7 @@
 #   open http://localhost:8027
 services:
   mailpeek:
-    image: mailpeek/mailpeek
+    image: 4ndbrslz/mailpeek
     ports:
       - "${MAILPEEK_SMTP_PORT:-1026}:${MAILPEEK_SMTP_PORT:-1026}"
       - "${MAILPEEK_HTTP_PORT:-8026}:${MAILPEEK_HTTP_PORT:-8026}"

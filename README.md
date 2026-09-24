@@ -21,7 +21,7 @@ One binary · zero config · ~8 MB · no database · CI friendly
 ```bash
 docker run --rm \
   -p 1026:1026 -p 8026:8026 \
-  mailpeek/mailpeek
+  4ndbrslz/mailpeek
 
 # point your app at localhost:1026
 open http://localhost:8026
@@ -56,7 +56,7 @@ Both modes use the same server: SMTP → MIME parser → in-memory store → eve
 ### Docker
 
 ```bash
-docker run --rm -p 1026:1026 -p 8026:8026 mailpeek/mailpeek
+docker run --rm -p 1026:1026 -p 8026:8026 4ndbrslz/mailpeek
 ```
 
 Configure your application:
@@ -78,7 +78,7 @@ Mailpeek's defaults (1026 for SMTP, 8026 for the Web UI) are one above Mailpit's
 docker run --rm \
   -e MAILPEEK_SMTP_PORT=1027 -e MAILPEEK_HTTP_PORT=8027 \
   -p 1027:1027 -p 8027:8027 \
-  mailpeek/mailpeek
+  4ndbrslz/mailpeek
 ```
 
 With the `docker-compose.yml` in this repository:
@@ -94,7 +94,7 @@ Then use `SMTP_PORT=1027`, open **http://localhost:8027** and set `MAILPEEK_URL=
 Linux and macOS: the install script picks the binary for your system, verifies its SHA-256 checksum and installs it to `/usr/local/bin` (or `~/.local/bin` when that is not writable):
 
 ```bash
-curl -fsSL https://github.com/mailpeek/mailpeek/releases/latest/download/install.sh | sh
+curl -fsSL https://github.com/andbrslz/mailpeek/releases/latest/download/install.sh | sh
 mailpeek
 ```
 
@@ -103,7 +103,7 @@ mailpeek
 Windows (PowerShell):
 
 ```powershell
-Invoke-WebRequest https://github.com/mailpeek/mailpeek/releases/latest/download/mailpeek-windows-amd64.exe -OutFile mailpeek.exe
+Invoke-WebRequest https://github.com/andbrslz/mailpeek/releases/latest/download/mailpeek-windows-amd64.exe -OutFile mailpeek.exe
 .\mailpeek.exe
 ```
 
@@ -272,7 +272,7 @@ import { mailpeekWebServer } from "@mailpeek-dev/playwright";
 
 export default defineConfig({
   webServer: [
-    mailpeekWebServer(), // docker run … mailpeek/mailpeek, reused if already running
+    mailpeekWebServer(), // docker run … 4ndbrslz/mailpeek, reused if already running
     { command: "npm run dev", url: "http://localhost:3000" },
   ],
 });
@@ -378,7 +378,7 @@ jobs:
     runs-on: ubuntu-latest
     services:
       mailpeek:
-        image: mailpeek/mailpeek
+        image: 4ndbrslz/mailpeek
         ports:
           - 1026:1026
           - 8026:8026
@@ -400,7 +400,7 @@ jobs:
 ```yaml
 services:
   mailpeek:
-    image: mailpeek/mailpeek
+    image: 4ndbrslz/mailpeek
     ports:
       - "1026:1026"
       - "8026:8026"
@@ -464,7 +464,7 @@ Both are off by default and independent of each other. Values look like `user:pa
 docker run --rm -p 1026:1026 -p 8026:8026 \
   -e MAILPEEK_SMTP_AUTH=app:secret \
   -e MAILPEEK_UI_AUTH=admin:secret \
-  mailpeek/mailpeek
+  4ndbrslz/mailpeek
 ```
 
 The SDK and the Playwright fixture read the Web UI credentials from the URL, so tests only need `MAILPEEK_URL=http://admin:secret@localhost:8026` (or `new Mailpeek({ auth: { username, password } })`).
