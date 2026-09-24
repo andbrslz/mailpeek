@@ -32,6 +32,7 @@ export function useSidebarWidth() {
   const setWidth = useCallback((w: number) => setPreferred(fit(bound(w), window.innerWidth)), []);
 
   useEffect(() => {
+    if (preferred === read()) return;
     const t = window.setTimeout(() => {
       try {
         window.localStorage.setItem(storageKey, String(preferred));
