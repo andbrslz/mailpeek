@@ -1,0 +1,16 @@
+{
+  "name": "@mailpeek/e2e",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test:e2e": "playwright test",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@mailpeek-dev/client": "^0.1.0",
+    "@mailpeek-dev/playwright": "^0.1.0",
+    "@playwright/test": "^1.63.0",
+    "@types/nodemailer": "^8.0.2",
+    "nodemailer": "^10.0.10"
+  }
+}

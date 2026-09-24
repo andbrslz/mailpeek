@@ -1,0 +1,56 @@
+{
+  "name": "@mailpeek-dev/playwright",
+  "version": "0.1.0",
+  "description": "Playwright fixture for Mailpeek: isolated inboxes and waitFor() for email tests.",
+  "license": "MIT",
+  "type": "module",
+  "keywords": [
+    "playwright",
+    "email",
+    "smtp",
+    "testing",
+    "e2e",
+    "mailpeek"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/andbrslz/mailpeek.git",
+    "directory": "packages/playwright"
+  },
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    }
+  },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "sideEffects": false,
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@mailpeek-dev/client": "^0.1.0"
+  },
+  "peerDependencies": {
+    "@playwright/test": ">=1.40.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.63.0",
+    "tsup": "^8.5.1"
+  }
+}

@@ -1,0 +1,115 @@
+# Mailpeek
+
+> Local email testing server for development and CI. It accepts mail over SMTP, keeps it in memory (it never delivers or relays anything), shows it in a Web UI and exposes a REST API with a blocking "wait for email" endpoint, plus a TypeScript/Playwright SDK. One binary or one Docker image, no configuration, no database.
+
+Defaults: SMTP on port 1026, Web UI and API on http://localhost:8026. The binary accepts connections from this machine only (`127.0.0.1` and `::1`); the Docker image listens on all interfaces. No TLS unless `--smtp-tls`. Any SMTP username/password is accepted unless Mailpeek runs with `--smtp-auth`. Messages are lost when Mailpeek stops.
+
+## 1. Start Mailpeek (pick one)
+
+Docker:
+
+```bash
+docker run -d --name mailpeek -p 1026:1026 -p 8026:8026 4ndbrslz/mailpeek
+```
+
+Docker Compose, next to the application (the app reaches it as host `mailpeek`, not `localhost`):
+
+```yaml
+services:
+  mailpeek:
+    image: 4ndbrslz/mailpeek
+    ports: ["1026:1026", "8026:8026"]
+```
+
+Binary on Linux or macOS (detects OS/architecture, verifies the SHA-256 checksum, installs to /usr/local/bin or ~/.local/bin):
+
+```bash
+curl -fsSL https://github.com/andbrslz/mailpeek/releases/latest/download/install.sh | sh
+mailpeek
+```
+
+Binary on Windows (PowerShell):
+
+```powershell
+Invoke-WebRequest https://github.com/andbrslz/mailpeek/releases/latest/download/mailpeek-windows-amd64.exe -OutFile mailpeek.exe
+.\mailpeek.exe
+```
+
+Release assets are named `mailpeek-<os>-<arch>` (linux/darwin amd64/arm64, windows amd64 with `.exe`) next to `checksums.txt`.
+
+Do not use `go install`: it builds a binary without the Web UI (the banner then says "API only").
+
+It is ready when `mailpeek healthcheck` exits 0, or `curl -fs http://localhost:8026/api/v1/health` returns `{"status":"ok"}`. Startup takes a few milliseconds.
+
+## 2. Point the application at it
+
+SMTP host `localhost` (or `mailpeek` from another Compose service), port `1026`, no TLS/SSL, no authentication needed.
+
+- Nodemailer: `nodemailer.createTransport({ host: "localhost", port: 1026, secure: false })`
+- Django: `EMAIL_HOST = "localhost"`, `EMAIL_PORT = 1026`, `EMAIL_USE_TLS = False`, `EMAIL_USE_SSL = False`
+- Rails: `config.action_mailer.delivery_method = :smtp` and `config.action_mailer.smtp_settings = { address: "localhost", port: 1026 }`
+- Laravel (.env): `MAIL_MAILER=smtp`, `MAIL_HOST=localhost`, `MAIL_PORT=1026`, `MAIL_ENCRYPTION=null`
+- Symfony (.env): `MAILER_DSN=smtp://localhost:1026`
+- Spring Boot: `spring.mail.host=localhost`, `spring.mail.port=1026`
+- Anything else: the usual `SMTP_HOST=localhost` / `SMTP_PORT=1026` settings, with TLS/STARTTLS off
+
+## 3. Verify it works
+
+```bash
+mailpeek send --to test@example.com --subject "Hello"      # prints: Sent "Hello" to test@example.com (id <id>)
+curl -s "http://localhost:8026/api/v1/messages?limit=5"     # newest first
+curl -s "http://localhost:8026/api/v1/messages/<id>"        # full message: text, html, headers, links, attachments
+```
+
+With the Docker image: `docker exec mailpeek /mailpeek send --to test@example.com`.
+
+`mailpeek send` flags: `--to` (required; repeat or comma-separate), `--subject`, `--text`, `--html`, `--from`, `--host` (default localhost), `--port` (default 1026 or `MAILPEEK_SMTP_PORT`), `--auth user:password` (or `MAILPEEK_SMTP_AUTH`).
+
+Open http://localhost:8026 to see the email in the Web UI.
+
+## 4. Configuration
+
+Flags win over environment variables.
+
+| Flag | Environment | Default |
+| --- | --- | --- |
+| `--smtp-port` | `MAILPEEK_SMTP_PORT` | `1026` |
+| `--http-port` | `MAILPEEK_HTTP_PORT` | `8026` |
+| `--host` | `MAILPEEK_HOST` | `localhost` (binary); `0.0.0.0` in the Docker image. Use `0.0.0.0` when containers or other machines must reach a binary |
+| `--max-messages` | `MAILPEEK_MAX_MESSAGES` | `100` (oldest removed first) |
+| `--max-message-size` | `MAILPEEK_MAX_MESSAGE_SIZE` | `10MB` |
+| `--max-store-size` | `MAILPEEK_MAX_STORE_SIZE` | `256MB` |
+| `--smtp-auth` | `MAILPEEK_SMTP_AUTH` | off; `user:password` requires that SMTP login |
+| `--ui-auth` | `MAILPEEK_UI_AUTH` | off; `user:password` protects the Web UI and API (HTTP Basic for API clients) |
+| `--smtp-tls` | `MAILPEEK_SMTP_TLS` | off; `true` offers STARTTLS with a self-signed certificate (clients must skip verification) |
+| `--smtp-tls-cert`, `--smtp-tls-key` | `MAILPEEK_SMTP_TLS_CERT`, `MAILPEEK_SMTP_TLS_KEY` | PEM files for STARTTLS |
+
+In Docker use the same port inside and outside: `-e MAILPEEK_SMTP_PORT=1027 -p 1027:1027`.
+
+## 5. Troubleshooting
+
+- "SMTP port 1026 is already in use": another Mailpeek (or mail catcher) is running. Reuse it, stop it, or pick other ports with `MAILPEEK_SMTP_PORT` / `MAILPEEK_HTTP_PORT`.
+- The application says TLS/STARTTLS is required: start Mailpeek with `--smtp-tls` and turn certificate verification off in the app (Nodemailer: `tls: { rejectUnauthorized: false }`), or turn TLS off in its mail settings. Implicit TLS (SMTPS, port 465, Nodemailer `secure: true`) is not supported: use `secure: false`.
+- Every received email and every rejection is logged on Mailpeek's standard output ("received <id> from ... to ..."): check it first when an email seems missing.
+- A binary Mailpeek is not reachable from a container or another machine: it listens on localhost only; start it with `--host 0.0.0.0`.
+- A containerized app cannot connect to `localhost:1026`: inside a container `localhost` is the container itself; use the Compose service name (`mailpeek`) or `host.docker.internal`.
+- "530 Authentication required": Mailpeek runs with `--smtp-auth`; configure the same user and password in the app (`mailpeek send --auth user:password`).
+- Messages disappeared: they live in memory, and the oldest are removed beyond `MAILPEEK_MAX_MESSAGES` (see `evicted` in `GET /api/v1/info`).
+- Web UI says "not built": the binary came from `go install`; use a release binary or the Docker image.
+- Building from this repository instead: `make build` (needs Go 1.25+ and Node 20.19+), then `./bin/mailpeek`. After code changes, a Compose container needs `docker compose up -d --build`.
+
+## 6. API
+
+- OpenAPI 3.1 description: `GET /api/v1/openapi.json` on the running server
+- `GET /api/v1/messages` (filters `address`, `to`, `from`, `subject`, `body`, `q`, `since`; paging `limit` + `cursor`), `GET /api/v1/messages/count`, `GET /api/v1/messages/latest`
+- `GET /api/v1/messages/wait?address=...&timeout=10000`: returns the newest match, waiting for one to arrive (204 on timeout)
+- `GET /api/v1/messages/{id}`, `/raw`, `/attachments/{attachmentId}`; `DELETE /api/v1/messages` (with or without filters)
+- `GET /api/v1/events`: server-sent events for new and deleted messages
+- `POST /api/v1/smtp/failures` with JSON `{"code":451,"stage":"data","address":"ana@example.com","count":1}` (Content-Type `application/json`): the next matching deliveries fail, to test retries; `DELETE /api/v1/smtp/failures` removes pending rules. SDK: `inbox.failNext({ code: 451 })`
+
+## Docs
+
+- [README](https://github.com/andbrslz/mailpeek/blob/master/README.md): full guide
+- [Playwright quick start](https://github.com/andbrslz/mailpeek/blob/master/README.md#playwright-quick-start): `@mailpeek-dev/playwright` fixture with per-test inboxes
+- [TypeScript client](https://github.com/andbrslz/mailpeek/blob/master/README.md#typescript-client-vitest-jest-scripts): `@mailpeek-dev/client` for Vitest, Jest and scripts
+- [CI](https://github.com/andbrslz/mailpeek/blob/master/README.md#ci): GitHub Actions and Docker Compose setups

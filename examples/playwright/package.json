@@ -1,0 +1,17 @@
+{
+  "name": "mailpeek-example-playwright",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "app": "node app/server.js",
+    "test:e2e": "playwright test",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "nodemailer": "^10.0.10"
+  },
+  "devDependencies": {
+    "@mailpeek-dev/playwright": "^0.1.0",
+    "@playwright/test": "^1.63.0"
+  }
+}

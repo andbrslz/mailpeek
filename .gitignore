@@ -1,0 +1,21 @@
+# Build output
+/bin/
+/dist/
+web/dist/*
+!web/dist/.gitkeep
+packages/*/dist/
+
+# Node
+node_modules/
+*.tsbuildinfo
+
+# Playwright
+test-results/
+selftest-results/
+playwright-report/
+blob-report/
+
+# OS / editors
+.DS_Store
+.idea/
+.vscode/

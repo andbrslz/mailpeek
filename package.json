@@ -1,0 +1,44 @@
+{
+  "name": "mailpeek-workspace",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "web",
+    "packages/client",
+    "packages/playwright",
+    "e2e",
+    "examples/playwright"
+  ],
+  "scripts": {
+    "build": "npm run build -w @mailpeek-dev/client -w @mailpeek-dev/playwright -w @mailpeek/web",
+    "lint": "eslint . && prettier --check .",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "audit": "npm audit --audit-level=low",
+    "doctor": "react-doctor web --blocking warning --no-telemetry -y",
+    "ui:size": "node scripts/check-ui-size.mjs",
+    "ui:i18n": "node scripts/check-ui-i18n.mjs",
+    "check": "npm run lint && npm run ui:size && npm run ui:i18n && npm run typecheck && npm run build && npm test && npm run audit && npm run doctor",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^24.0.0",
+    "esbuild": "^0.28.2",
+    "eslint": "^10.11.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "eslint-plugin-react-refresh": "^0.5.7",
+    "globals": "^17.12.0",
+    "prettier": "^3.9.9",
+    "react-doctor": "^0.9.14",
+    "typescript": "~6.0.3",
+    "typescript-eslint": "^8.70.1"
+  },
+  "engines": {
+    "node": ">=20.19"
+  },
+  "overrides": {
+    "esbuild": "^0.28.2"
+  }
+}

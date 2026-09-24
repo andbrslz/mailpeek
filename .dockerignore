@@ -1,0 +1,9 @@
+**/node_modules
+**/dist
+!web/dist/.gitkeep
+bin
+.git
+.github
+**/test-results
+**/playwright-report
+*.md

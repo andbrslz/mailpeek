@@ -1,0 +1,1319 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Mailpeek API",
+    "version": "1",
+    "description": "Email testing server: catches SMTP mail in memory and exposes it over HTTP. All paths are relative to the Web UI address (default http://localhost:8026). Send mail to the SMTP port (default 1026). Authentication is only required when Mailpeek runs with --ui-auth."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8026"
+    }
+  ],
+  "security": [
+    {},
+    {
+      "basicAuth": []
+    }
+  ],
+  "paths": {
+    "/api/v1/health": {
+      "get": {
+        "summary": "Health check (never requires authentication)",
+        "operationId": "health",
+        "security": [{}],
+        "responses": {
+          "200": {
+            "description": "Mailpeek is running",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "const": "ok"
+                    }
+                  },
+                  "required": ["status"]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/info": {
+      "get": {
+        "summary": "Version, ports, limits and store usage",
+        "operationId": "info",
+        "responses": {
+          "200": {
+            "description": "Instance information",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Info"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Login required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/openapi.json": {
+      "get": {
+        "summary": "This OpenAPI document",
+        "operationId": "openapi",
+        "responses": {
+          "200": {
+            "description": "OpenAPI 3.1 document",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Login required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/events": {
+      "get": {
+        "summary": "Server-sent events for store changes",
+        "operationId": "events",
+        "description": "Events: message.created and message.deleted (data {\"id\":\"…\"}), messages.cleared, and resync (the client fell behind: reload everything).",
+        "responses": {
+          "200": {
+            "description": "Event stream",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Login required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/messages": {
+      "get": {
+        "summary": "List messages, newest first",
+        "operationId": "listMessages",
+        "description": "Without limit every match is returned. With limit the listing is paged: pass nextCursor back as cursor for the following page; it is absent on the last page.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/address"
+          },
+          {
+            "$ref": "#/components/parameters/to"
+          },
+          {
+            "$ref": "#/components/parameters/from"
+          },
+          {
+            "$ref": "#/components/parameters/subject"
+          },
+          {
+            "$ref": "#/components/parameters/body"
+          },
+          {
+            "$ref": "#/components/parameters/q"
+          },
+          {
+            "$ref": "#/components/parameters/since"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "description": "Page size."
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "nextCursor from the previous page."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Messages",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "messages": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Summary"
+                      }
+                    },
+                    "count": {
+                      "type": "integer",
+                      "description": "Messages in this response."
+                    },
+                    "nextCursor": {
+                      "type": "string",
+                      "description": "Present when more messages match."
+                    }
+                  },
+                  "required": ["messages", "count"]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid filter, limit or cursor",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Login required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete matching messages (all when no filter is given)",
+        "operationId": "deleteMessages",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/address"
+          },
+          {
+            "$ref": "#/components/parameters/to"
+          },
+          {
+            "$ref": "#/components/parameters/from"
+          },
+          {
+            "$ref": "#/components/parameters/subject"
+          },
+          {
+            "$ref": "#/components/parameters/body"
+          },
+          {
+            "$ref": "#/components/parameters/q"
+          },
+          {
+            "$ref": "#/components/parameters/since"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "deleted": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": ["deleted"]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid filter",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Login required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/messages/count": {
+      "get": {
+        "summary": "Count matching messages",
+        "operationId": "countMessages",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/address"
+          },
+          {
+            "$ref": "#/components/parameters/to"
+          },
+          {
+            "$ref": "#/components/parameters/from"
+          },
+          {
+            "$ref": "#/components/parameters/subject"
+          },
+          {
+            "$ref": "#/components/parameters/body"
+          },
+          {
+            "$ref": "#/components/parameters/q"
+          },
+          {
+            "$ref": "#/components/parameters/since"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Count",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "count": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": ["count"]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid filter",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Login required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/messages/latest": {
+      "get": {
+        "summary": "Newest matching message",
+        "operationId": "latestMessage",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/address"
+          },
+          {
+            "$ref": "#/components/parameters/to"
+          },
+          {
+            "$ref": "#/components/parameters/from"
+          },
+          {
+            "$ref": "#/components/parameters/subject"
+          },
+          {
+            "$ref": "#/components/parameters/body"
+          },
+          {
+            "$ref": "#/components/parameters/q"
+          },
+          {
+            "$ref": "#/components/parameters/since"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Message",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Message"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid filter",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Login required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No matching message",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/messages/wait": {
+      "get": {
+        "summary": "Newest matching message, waiting for one to arrive",
+        "operationId": "waitMessage",
+        "description": "Returns at once when a match exists; otherwise blocks until one arrives or the timeout expires. No polling needed.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/address"
+          },
+          {
+            "$ref": "#/components/parameters/to"
+          },
+          {
+            "$ref": "#/components/parameters/from"
+          },
+          {
+            "$ref": "#/components/parameters/subject"
+          },
+          {
+            "$ref": "#/components/parameters/body"
+          },
+          {
+            "$ref": "#/components/parameters/q"
+          },
+          {
+            "$ref": "#/components/parameters/since"
+          },
+          {
+            "name": "timeout",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 30000,
+              "default": 10000
+            },
+            "description": "Milliseconds; values above 30000 are clamped."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Message",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Message"
+                }
+              }
+            }
+          },
+          "204": {
+            "description": "Timed out without a match"
+          },
+          "400": {
+            "description": "Invalid filter or timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Login required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Request cancelled or server shutting down",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/messages/{id}": {
+      "get": {
+        "summary": "Full message",
+        "operationId": "getMessage",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Message id (16 hex characters)."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Message",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Message"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Login required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Message not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete a message",
+        "operationId": "deleteMessage",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Message id (16 hex characters)."
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted"
+          },
+          "401": {
+            "description": "Login required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Message not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/messages/{id}/raw": {
+      "get": {
+        "summary": "Raw MIME source",
+        "operationId": "rawMessage",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Message id (16 hex characters)."
+          },
+          {
+            "name": "download",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Any value: download as {id}.eml (message/rfc822)."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "MIME source",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "message/rfc822": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Login required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Message not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/messages/{id}/attachments/{attachmentId}": {
+      "get": {
+        "summary": "Download an attachment",
+        "operationId": "attachment",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Message id (16 hex characters)."
+          },
+          {
+            "name": "attachmentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Attachment id from Message.attachments."
+          },
+          {
+            "name": "inline",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Any value: display PNG, JPEG, GIF, WebP, AVIF or BMP images in the browser instead of downloading them. Other types are always downloaded."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Attachment content, always served as a download",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Login required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Message or attachment not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/smtp/failures": {
+      "get": {
+        "summary": "Pending simulated SMTP failures",
+        "operationId": "listFailures",
+        "responses": {
+          "200": {
+            "description": "Rules, oldest first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "failures": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/FailureRule"
+                      }
+                    }
+                  },
+                  "required": ["failures"]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Login required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Make upcoming SMTP deliveries fail",
+        "operationId": "addFailure",
+        "description": "The next `count` deliveries matching the rule get the error reply instead of being accepted, so an application's retry and error handling can be tested. Rules apply in the order they were added. Scope a rule with `address` so parallel tests do not affect each other.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "stage": {
+                    "type": "string",
+                    "enum": ["rcpt", "data"],
+                    "default": "data"
+                  },
+                  "code": {
+                    "type": "integer",
+                    "minimum": 400,
+                    "maximum": 599,
+                    "default": 451
+                  },
+                  "message": {
+                    "type": "string",
+                    "description": "Single line. Default: a temporary (4xx) or permanent (5xx) failure text."
+                  },
+                  "address": {
+                    "type": "string"
+                  },
+                  "count": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 10000,
+                    "default": 1
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Rule added",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FailureRule"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid rule or JSON",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Login required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Content-Type must be application/json",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Remove simulated failures",
+        "operationId": "clearFailures",
+        "parameters": [
+          {
+            "name": "address",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Only the rules for this address."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Removed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "deleted": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": ["deleted"]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Login required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/smtp/failures/{id}": {
+      "delete": {
+        "summary": "Remove one simulated failure",
+        "operationId": "deleteFailure",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Removed"
+          },
+          "401": {
+            "description": "Login required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Rule not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "basicAuth": {
+        "type": "http",
+        "scheme": "basic",
+        "description": "Only when Mailpeek runs with --ui-auth user:password."
+      }
+    },
+    "parameters": {
+      "address": {
+        "name": "address",
+        "in": "query",
+        "schema": {
+          "type": "string"
+        },
+        "description": "Exact recipient address (To, Cc or envelope), case-insensitive. Use it for per-test inboxes."
+      },
+      "to": {
+        "name": "to",
+        "in": "query",
+        "schema": {
+          "type": "string"
+        },
+        "description": "Substring of a recipient address or name (To, Cc or envelope)."
+      },
+      "from": {
+        "name": "from",
+        "in": "query",
+        "schema": {
+          "type": "string"
+        },
+        "description": "Substring of the From header or envelope sender."
+      },
+      "subject": {
+        "name": "subject",
+        "in": "query",
+        "schema": {
+          "type": "string"
+        },
+        "description": "Substring of the subject."
+      },
+      "q": {
+        "name": "q",
+        "in": "query",
+        "schema": {
+          "type": "string"
+        },
+        "description": "Substring of subject, from, to or body."
+      },
+      "since": {
+        "name": "since",
+        "in": "query",
+        "schema": {
+          "type": "string"
+        },
+        "description": "Received at or after: RFC 3339 or Unix milliseconds."
+      },
+      "body": {
+        "name": "body",
+        "in": "query",
+        "schema": {
+          "type": "string"
+        },
+        "description": "Substring of the text or HTML body."
+      }
+    },
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string"
+          }
+        },
+        "required": ["error"]
+      },
+      "Address": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "address": {
+            "type": "string"
+          }
+        },
+        "required": ["address"]
+      },
+      "Envelope": {
+        "type": "object",
+        "description": "SMTP envelope; may include recipients missing from the headers (Bcc).",
+        "properties": {
+          "from": {
+            "type": "string"
+          },
+          "to": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": ["from", "to"]
+      },
+      "Attachment": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "filename": {
+            "type": "string"
+          },
+          "contentType": {
+            "type": "string"
+          },
+          "contentId": {
+            "type": "string"
+          },
+          "inline": {
+            "type": "boolean"
+          },
+          "size": {
+            "type": "integer"
+          }
+        },
+        "required": ["id", "filename", "contentType", "inline", "size"]
+      },
+      "Link": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string"
+          },
+          "href": {
+            "type": "string"
+          }
+        },
+        "required": ["text", "href"]
+      },
+      "Summary": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "from": {
+            "$ref": "#/components/schemas/Address"
+          },
+          "to": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Address"
+            }
+          },
+          "cc": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Address"
+            }
+          },
+          "subject": {
+            "type": "string"
+          },
+          "envelope": {
+            "$ref": "#/components/schemas/Envelope"
+          },
+          "attachments": {
+            "type": "integer",
+            "description": "Number of attachments."
+          },
+          "size": {
+            "type": "integer"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "from",
+          "to",
+          "cc",
+          "subject",
+          "envelope",
+          "attachments",
+          "size",
+          "createdAt"
+        ]
+      },
+      "Message": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "messageId": {
+            "type": "string"
+          },
+          "from": {
+            "$ref": "#/components/schemas/Address"
+          },
+          "to": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Address"
+            }
+          },
+          "cc": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Address"
+            }
+          },
+          "replyTo": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Address"
+            }
+          },
+          "subject": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "text": {
+            "type": "string"
+          },
+          "html": {
+            "type": "string"
+          },
+          "headers": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "attachments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Attachment"
+            }
+          },
+          "links": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Link"
+            },
+            "description": "Anchors of the HTML body, or URLs of the text body when there is no HTML."
+          },
+          "envelope": {
+            "$ref": "#/components/schemas/Envelope"
+          },
+          "size": {
+            "type": "integer"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "from",
+          "to",
+          "cc",
+          "replyTo",
+          "subject",
+          "text",
+          "html",
+          "headers",
+          "attachments",
+          "links",
+          "envelope",
+          "size",
+          "createdAt"
+        ]
+      },
+      "Info": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "string"
+          },
+          "smtpPort": {
+            "type": "integer"
+          },
+          "httpPort": {
+            "type": "integer"
+          },
+          "maxMessages": {
+            "type": "integer"
+          },
+          "maxMessageSize": {
+            "type": "integer"
+          },
+          "maxStoreSize": {
+            "type": "integer"
+          },
+          "smtpAuth": {
+            "type": "boolean",
+            "description": "SMTP clients must log in."
+          },
+          "uiAuth": {
+            "type": "boolean",
+            "description": "The Web UI and API require a login."
+          },
+          "store": {
+            "type": "object",
+            "properties": {
+              "messages": {
+                "type": "integer"
+              },
+              "bytes": {
+                "type": "integer"
+              },
+              "evicted": {
+                "type": "integer",
+                "description": "Messages removed because a limit was reached."
+              }
+            },
+            "required": ["messages", "bytes", "evicted"]
+          },
+          "smtpTls": {
+            "type": "boolean",
+            "description": "SMTP offers STARTTLS."
+          }
+        },
+        "required": [
+          "version",
+          "smtpPort",
+          "httpPort",
+          "maxMessages",
+          "maxMessageSize",
+          "maxStoreSize",
+          "smtpAuth",
+          "uiAuth",
+          "store",
+          "smtpTls"
+        ]
+      },
+      "FailureRule": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "stage": {
+            "type": "string",
+            "enum": ["rcpt", "data"],
+            "description": "rcpt: the RCPT TO command is refused. data: the message is refused after it was sent (not stored)."
+          },
+          "code": {
+            "type": "integer",
+            "minimum": 400,
+            "maximum": 599
+          },
+          "message": {
+            "type": "string",
+            "description": "Reply text after the code."
+          },
+          "address": {
+            "type": "string",
+            "description": "Only for this recipient (exact, case-insensitive); absent for any recipient."
+          },
+          "remaining": {
+            "type": "integer",
+            "description": "How many more times the rule applies; it is removed at zero."
+          }
+        },
+        "required": ["id", "stage", "code", "message", "remaining"]
+      }
+    }
+  }
+}

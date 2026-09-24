@@ -1,0 +1,37 @@
+# Mailpeek next to an application. The app sends mail to SMTP_HOST=mailpeek;
+# you read it in the browser.
+#
+#   docker compose up
+#   open http://localhost:8026
+#
+# Defaults are 1026/8026, so Mailpit or MailHog (1025/8025) can run alongside.
+# Other ports:
+#   MAILPEEK_SMTP_PORT=1027 MAILPEEK_HTTP_PORT=8027 docker compose up
+#   open http://localhost:8027
+services:
+  mailpeek:
+    image: 4ndbrslz/mailpeek
+    ports:
+      - "${MAILPEEK_SMTP_PORT:-1026}:${MAILPEEK_SMTP_PORT:-1026}"
+      - "${MAILPEEK_HTTP_PORT:-8026}:${MAILPEEK_HTTP_PORT:-8026}"
+    environment:
+      MAILPEEK_SMTP_PORT: ${MAILPEEK_SMTP_PORT:-1026}
+      MAILPEEK_HTTP_PORT: ${MAILPEEK_HTTP_PORT:-8026}
+
+  # Stand-in for your application: sends one email through Mailpeek using
+  # BusyBox sendmail, then exits. Replace with your own service.
+  app:
+    image: alpine:3
+    environment:
+      SMTP_HOST: mailpeek
+      SMTP_PORT: ${MAILPEEK_SMTP_PORT:-1026}
+    depends_on:
+      mailpeek:
+        condition: service_healthy
+    command:
+      - sh
+      - -c
+      - |
+        printf 'From: app@example.com\nTo: john@example.com\nSubject: Welcome\n\nHello John, welcome aboard!\nActivate: http://localhost:3000/activate/abc\n' \
+          | sendmail -S "$$SMTP_HOST:$$SMTP_PORT" -f app@example.com john@example.com
+        echo "Sent. Open the Mailpeek Web UI"
