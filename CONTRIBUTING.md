@@ -9,7 +9,7 @@ Thanks for helping. Bug reports, ideas and pull requests are welcome.
 
 ## Development setup
 
-You need Go 1.25+ and Node 20.19+.
+You need Go 1.26+ and Node 20.19+.
 
 ```bash
 npm ci
