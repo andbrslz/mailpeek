@@ -149,7 +149,7 @@ make build        # builds the Web UI, then bin/mailpeek with the UI embedded
 ./bin/mailpeek
 ```
 
-Requires Go 1.25+ and Node 20.19+.
+Requires Go 1.26+ and Node 20.19+.
 
 `go install` is not a supported way to install Mailpeek: the Web UI is built by Vite and embedded at build time, so a `go install` binary serves the API only (its banner says so). Use a release binary, the Docker image or `make build`.
 
