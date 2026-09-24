@@ -14,7 +14,7 @@ func TestLoadDefaults(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg.SMTPPort != 1026 || cfg.HTTPPort != 8026 || cfg.MaxMessages != 100 || cfg.MaxMessageSize != 10<<20 {
+	if cfg.SMTPPort != 1026 || cfg.HTTPPort != 8026 || cfg.MaxMessages != 1000 || cfg.DataDir != "" || cfg.MaxMessageSize != 10<<20 {
 		t.Fatalf("unexpected defaults: %+v", cfg)
 	}
 	if cfg.SMTPAddr() != "localhost:1026" || cfg.HTTPAddr() != "localhost:8026" {
@@ -32,25 +32,26 @@ func TestLoadEnv(t *testing.T) {
 		"MAILPEEK_HTTP_PORT":        "9000",
 		"MAILPEEK_MAX_MESSAGES":     "5",
 		"MAILPEEK_MAX_MESSAGE_SIZE": "1MB",
+		"MAILPEEK_DATA_DIR":         "/data",
 	}), io.Discard)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg.SMTPPort != 2525 || cfg.HTTPPort != 9000 || cfg.MaxMessages != 5 || cfg.MaxMessageSize != 1<<20 {
+	if cfg.SMTPPort != 2525 || cfg.HTTPPort != 9000 || cfg.MaxMessages != 5 || cfg.MaxMessageSize != 1<<20 || cfg.DataDir != "/data" {
 		t.Fatalf("env not applied: %+v", cfg)
 	}
 }
 
 func TestFlagsOverrideEnv(t *testing.T) {
 	cfg, err := Load(
-		[]string{"--smtp-port", "3025", "--max-messages", "7", "--max-message-size", "512KB"},
-		env(map[string]string{"MAILPEEK_SMTP_PORT": "2525", "MAILPEEK_MAX_MESSAGES": "5"}),
+		[]string{"--smtp-port", "3025", "--max-messages", "7", "--max-message-size", "512KB", "--data-dir", "./mail"},
+		env(map[string]string{"MAILPEEK_SMTP_PORT": "2525", "MAILPEEK_MAX_MESSAGES": "5", "MAILPEEK_DATA_DIR": "/data"}),
 		io.Discard,
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg.SMTPPort != 3025 || cfg.MaxMessages != 7 || cfg.MaxMessageSize != 512<<10 {
+	if cfg.SMTPPort != 3025 || cfg.MaxMessages != 7 || cfg.MaxMessageSize != 512<<10 || cfg.DataDir != "./mail" {
 		t.Fatalf("flags did not take precedence: %+v", cfg)
 	}
 }

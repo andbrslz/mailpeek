@@ -5,8 +5,8 @@ import (
 	"slices"
 	"sync"
 
-	"github.com/mailpeek/mailpeek/internal/events"
-	"github.com/mailpeek/mailpeek/internal/mail"
+	"github.com/andbrslz/mailpeek/internal/events"
+	"github.com/andbrslz/mailpeek/internal/mail"
 )
 
 type entry struct {
@@ -40,6 +40,7 @@ type MemoryStore struct {
 	order    []string
 	items    map[string]entry
 	broker   *events.Broker
+	disk     *disk
 }
 
 func New(max int, broker *events.Broker) *MemoryStore {
@@ -55,6 +56,10 @@ func (s *MemoryStore) WithMaxBytes(n int64) *MemoryStore {
 }
 
 func (s *MemoryStore) Save(m *mail.Message, raw []byte) {
+	s.save(m, raw, true)
+}
+
+func (s *MemoryStore) save(m *mail.Message, raw []byte, persist bool) {
 	s.mu.Lock()
 	s.seq++
 	e := entry{msg: m, raw: raw, size: sizeOf(m, raw), seq: s.seq}
@@ -70,6 +75,12 @@ func (s *MemoryStore) Save(m *mail.Message, raw []byte) {
 		s.order = slices.Delete(s.order, 0, 1)
 	}
 	s.evicted += int64(len(evicted))
+	if s.disk != nil {
+		if persist {
+			s.disk.write(m, raw)
+		}
+		s.disk.remove(evicted)
+	}
 	s.mu.Unlock()
 
 	for _, id := range evicted {
@@ -172,6 +183,9 @@ func (s *MemoryStore) Delete(id string) bool {
 		s.bytes -= e.size
 		delete(s.items, id)
 		s.order = slices.DeleteFunc(s.order, func(v string) bool { return v == id })
+		if s.disk != nil {
+			s.disk.remove([]string{id})
+		}
 	}
 	s.mu.Unlock()
 
@@ -199,6 +213,9 @@ func (s *MemoryStore) DeleteMatching(f Filter) int {
 			}
 			return false
 		})
+	}
+	if s.disk != nil {
+		s.disk.remove(removed)
 	}
 	s.mu.Unlock()
 

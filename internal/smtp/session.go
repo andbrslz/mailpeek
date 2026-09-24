@@ -13,7 +13,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/mailpeek/mailpeek/internal/config"
+	"github.com/andbrslz/mailpeek/internal/config"
 )
 
 const maxErrors = 10

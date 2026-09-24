@@ -26,10 +26,12 @@ ARG VERSION=dev
 ARG TARGETOS TARGETARCH
 RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH \
     go build -trimpath -ldflags "-s -w -X main.version=${VERSION}" -o /mailpeek ./cmd/mailpeek
+RUN mkdir /data
 
 # 3. Runtime: just the binary
 FROM scratch
 COPY --from=build /mailpeek /mailpeek
+COPY --from=build --chown=65534:65534 /data /data
 ENV MAILPEEK_HOST=0.0.0.0
 USER 65534:65534
 EXPOSE 1026 8026

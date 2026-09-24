@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mailpeek/mailpeek/internal/config"
+	"github.com/andbrslz/mailpeek/internal/config"
 )
 
 type syncBuffer struct {
@@ -93,5 +93,18 @@ func TestBannerWarnsWithoutWebUI(t *testing.T) {
 	}
 	if !strings.Contains(withoutUI.String(), "API only") || !strings.Contains(withoutUI.String(), "go install") {
 		t.Errorf("banner without UI does not explain it:\n%s", withoutUI.String())
+	}
+}
+
+func TestBannerShowsDataDir(t *testing.T) {
+	a, _ := startMailpeek(t, "")
+	var memory, disk syncBuffer
+	printBanner(&memory, config.Config{Host: "127.0.0.1"}, a, true, 0)
+	printBanner(&disk, config.Config{Host: "127.0.0.1", DataDir: "/data"}, a, true, 0)
+	if strings.Contains(memory.String(), "Data  ") {
+		t.Errorf("banner without a data dir mentions one:\n%s", memory.String())
+	}
+	if !strings.Contains(disk.String(), "Data  /data  (0 messages kept across restarts)\n") {
+		t.Errorf("banner does not show the data dir:\n%s", disk.String())
 	}
 }

@@ -15,13 +15,13 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/mailpeek/mailpeek/internal/api"
-	"github.com/mailpeek/mailpeek/internal/config"
-	"github.com/mailpeek/mailpeek/internal/events"
-	"github.com/mailpeek/mailpeek/internal/failures"
-	"github.com/mailpeek/mailpeek/internal/mail"
-	"github.com/mailpeek/mailpeek/internal/smtp"
-	"github.com/mailpeek/mailpeek/internal/store"
+	"github.com/andbrslz/mailpeek/internal/api"
+	"github.com/andbrslz/mailpeek/internal/config"
+	"github.com/andbrslz/mailpeek/internal/events"
+	"github.com/andbrslz/mailpeek/internal/failures"
+	"github.com/andbrslz/mailpeek/internal/mail"
+	"github.com/andbrslz/mailpeek/internal/smtp"
+	"github.com/andbrslz/mailpeek/internal/store"
 )
 
 type App struct {
@@ -36,7 +36,9 @@ type App struct {
 	errs           chan error
 	parsing        chan struct{}
 	activity       *log.Logger
+	logger         *log.Logger
 	failures       *failures.Set
+	loaded         int
 }
 
 func New(cfg config.Config, ui fs.FS, version string, logger *log.Logger) *App {
@@ -48,6 +50,7 @@ func New(cfg config.Config, ui fs.FS, version string, logger *log.Logger) *App {
 		broker:  broker,
 		errs:    make(chan error, 2),
 		parsing: make(chan struct{}, max(2, runtime.NumCPU())),
+		logger:  logger,
 	}
 
 	a.failures = &failures.Set{}
@@ -153,6 +156,11 @@ func humanSize(n int) string {
 
 func (a *App) Start() error {
 	var err error
+	if a.cfg.DataDir != "" {
+		if a.loaded, err = a.store.Persist(a.cfg.DataDir, a.storageError); err != nil {
+			return err
+		}
+	}
 	if a.cfg.SMTPTLS {
 		if a.smtp.TLSConfig, err = a.tlsConfig(); err != nil {
 			return err
@@ -177,6 +185,14 @@ func (a *App) Start() error {
 	}()
 	return nil
 }
+
+func (a *App) storageError(err error) {
+	if a.logger != nil {
+		a.logger.Printf("data dir: %v", err)
+	}
+}
+
+func (a *App) Loaded() int { return a.loaded }
 
 func (a *App) Err() <-chan error { return a.errs }
 

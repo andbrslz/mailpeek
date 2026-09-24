@@ -23,10 +23,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mailpeek/mailpeek/internal/config"
-	"github.com/mailpeek/mailpeek/internal/mail"
-	"github.com/mailpeek/mailpeek/internal/smtp"
-	"github.com/mailpeek/mailpeek/internal/store"
+	"github.com/andbrslz/mailpeek/internal/config"
+	"github.com/andbrslz/mailpeek/internal/mail"
+	"github.com/andbrslz/mailpeek/internal/smtp"
+	"github.com/andbrslz/mailpeek/internal/store"
 )
 
 func startApp(t *testing.T) (*App, string, string) {

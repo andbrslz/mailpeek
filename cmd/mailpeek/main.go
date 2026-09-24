@@ -14,9 +14,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/mailpeek/mailpeek/internal/app"
-	"github.com/mailpeek/mailpeek/internal/config"
-	"github.com/mailpeek/mailpeek/web"
+	"github.com/andbrslz/mailpeek/internal/app"
+	"github.com/andbrslz/mailpeek/internal/config"
+	"github.com/andbrslz/mailpeek/web"
 )
 
 var version = "dev"
@@ -90,10 +90,21 @@ func printBanner(out io.Writer, cfg config.Config, a *app.App, hasUI bool, elaps
 		web += "  (API only: this binary was built without the Web UI, e.g. by go install;" +
 			" use a release binary, the Docker image or make build)"
 	}
-	fmt.Fprintf(out, "Mailpeek\n\nSMTP  smtp://%s%s\nWeb   http://%s%s\n\nReady in %dms\n",
+	data := ""
+	if cfg.DataDir != "" {
+		data = fmt.Sprintf("Data  %s  (%d %s kept across restarts)\n", cfg.DataDir, a.Loaded(), plural(a.Loaded(), "message"))
+	}
+	fmt.Fprintf(out, "Mailpeek\n\nSMTP  smtp://%s%s\nWeb   http://%s%s\n%s\nReady in %dms\n",
 		net.JoinHostPort(display, port(a.SMTPAddr())), smtpNote,
 		net.JoinHostPort(display, port(a.HTTPAddr())), web,
-		elapsed.Milliseconds())
+		data, elapsed.Milliseconds())
+}
+
+func plural(n int, word string) string {
+	if n == 1 {
+		return word
+	}
+	return word + "s"
 }
 
 func port(addr net.Addr) string {

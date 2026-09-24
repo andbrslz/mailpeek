@@ -15,7 +15,7 @@ import (
 const (
 	DefaultSMTPPort       = 1026
 	DefaultHTTPPort       = 8026
-	DefaultMaxMessages    = 100
+	DefaultMaxMessages    = 1000
 	DefaultMaxMessageSize = 10 << 20
 	DefaultMaxStoreSize   = 256 << 20
 )
@@ -32,6 +32,7 @@ type Config struct {
 	SMTPTLS        bool
 	SMTPTLSCert    string
 	SMTPTLSKey     string
+	DataDir        string
 }
 
 type Credentials struct {
@@ -89,6 +90,7 @@ func Load(args []string, getenv func(string) string, output io.Writer) (Config, 
 	fs.BoolVar(&cfg.SMTPTLS, "smtp-tls", cfg.SMTPTLS, "offer STARTTLS on SMTP, with a self-signed certificate unless --smtp-tls-cert is given (env MAILPEEK_SMTP_TLS)")
 	fs.StringVar(&cfg.SMTPTLSCert, "smtp-tls-cert", cfg.SMTPTLSCert, "PEM certificate for STARTTLS; implies --smtp-tls (env MAILPEEK_SMTP_TLS_CERT)")
 	fs.StringVar(&cfg.SMTPTLSKey, "smtp-tls-key", cfg.SMTPTLSKey, "PEM private key for --smtp-tls-cert (env MAILPEEK_SMTP_TLS_KEY)")
+	fs.StringVar(&cfg.DataDir, "data-dir", cfg.DataDir, "keep messages in this directory so they survive restarts; off keeps them in memory only (env MAILPEEK_DATA_DIR)")
 	if err := fs.Parse(args); err != nil {
 		return Config{}, err
 	}
@@ -114,6 +116,7 @@ func applyEnv(cfg *Config, getenv func(string) string) error {
 	}
 	cfg.SMTPTLSCert = orEnv(getenv("MAILPEEK_SMTP_TLS_CERT"), cfg.SMTPTLSCert)
 	cfg.SMTPTLSKey = orEnv(getenv("MAILPEEK_SMTP_TLS_KEY"), cfg.SMTPTLSKey)
+	cfg.DataDir = orEnv(getenv("MAILPEEK_DATA_DIR"), cfg.DataDir)
 	ints := []struct {
 		key string
 		dst *int

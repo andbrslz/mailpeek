@@ -4,7 +4,7 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/mailpeek/mailpeek/internal/mail"
+	"github.com/andbrslz/mailpeek/internal/mail"
 )
 
 const (

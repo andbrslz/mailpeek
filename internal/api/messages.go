@@ -9,8 +9,8 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/mailpeek/mailpeek/internal/events"
-	"github.com/mailpeek/mailpeek/internal/mail"
+	"github.com/andbrslz/mailpeek/internal/events"
+	"github.com/andbrslz/mailpeek/internal/mail"
 )
 
 type listResponse struct {

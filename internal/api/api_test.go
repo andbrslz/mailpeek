@@ -15,9 +15,9 @@ import (
 	"testing/fstest"
 	"time"
 
-	"github.com/mailpeek/mailpeek/internal/events"
-	"github.com/mailpeek/mailpeek/internal/mail"
-	"github.com/mailpeek/mailpeek/internal/store"
+	"github.com/andbrslz/mailpeek/internal/events"
+	"github.com/andbrslz/mailpeek/internal/mail"
+	"github.com/andbrslz/mailpeek/internal/store"
 )
 
 type env struct {

@@ -4,7 +4,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mailpeek/mailpeek/internal/mail"
+	"github.com/andbrslz/mailpeek/internal/mail"
 )
 
 type Filter struct {

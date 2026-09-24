@@ -8,9 +8,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mailpeek/mailpeek/internal/app"
-	"github.com/mailpeek/mailpeek/internal/config"
-	"github.com/mailpeek/mailpeek/internal/store"
+	"github.com/andbrslz/mailpeek/internal/app"
+	"github.com/andbrslz/mailpeek/internal/config"
+	"github.com/andbrslz/mailpeek/internal/store"
 )
 
 func startMailpeek(t *testing.T, smtpAuth string) (*app.App, func(string) string) {

@@ -16,8 +16,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mailpeek/mailpeek/internal/config"
-	"github.com/mailpeek/mailpeek/internal/mail"
+	"github.com/andbrslz/mailpeek/internal/config"
+	"github.com/andbrslz/mailpeek/internal/mail"
 )
 
 type sendOptions struct {

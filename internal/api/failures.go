@@ -5,7 +5,7 @@ import (
 	"mime"
 	"net/http"
 
-	"github.com/mailpeek/mailpeek/internal/failures"
+	"github.com/andbrslz/mailpeek/internal/failures"
 )
 
 func (s *Server) WithFailures(f *failures.Set) *Server {
