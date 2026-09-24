@@ -90,7 +90,7 @@ jobs:
             version=$(node -p "require('./$pkg/package.json').version")
             [ "v$version" = "$GITHUB_REF_NAME" ] || { echo "$pkg is $version, tag is $GITHUB_REF_NAME"; exit 1; }
           done
-      - run: npm install -g npm@latest
+      - run: npm install -g npm@11
       - run: npm ci
       - run: npm run build -w @mailpeek-dev/client -w @mailpeek-dev/playwright
       - run: npm test -w @mailpeek-dev/client
