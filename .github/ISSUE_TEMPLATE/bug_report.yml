@@ -1,0 +1,42 @@
+name: Bug report
+description: Something does not work as documented
+labels: [bug]
+body:
+  - type: input
+    id: version
+    attributes:
+      label: Mailpeek version
+      description: Output of `mailpeek version`, the Docker tag or the npm package version
+    validations:
+      required: true
+  - type: dropdown
+    id: runtime
+    attributes:
+      label: How do you run Mailpeek?
+      options:
+        - Docker image
+        - Docker Compose
+        - Release binary
+        - Built from source
+        - "@mailpeek-dev/playwright mailpeekWebServer()"
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: The smallest setup that shows the problem, e.g. the mailer settings and the test
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect, and what happened?
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Mailpeek output
+      description: The banner and the activity log lines around the problem
+      render: text

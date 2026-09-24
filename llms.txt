@@ -76,13 +76,14 @@ Flags win over environment variables.
 | `--smtp-port` | `MAILPEEK_SMTP_PORT` | `1026` |
 | `--http-port` | `MAILPEEK_HTTP_PORT` | `8026` |
 | `--host` | `MAILPEEK_HOST` | `localhost` (binary); `0.0.0.0` in the Docker image. Use `0.0.0.0` when containers or other machines must reach a binary |
-| `--max-messages` | `MAILPEEK_MAX_MESSAGES` | `100` (oldest removed first) |
+| `--max-messages` | `MAILPEEK_MAX_MESSAGES` | `1000` (oldest removed first) |
 | `--max-message-size` | `MAILPEEK_MAX_MESSAGE_SIZE` | `10MB` |
 | `--max-store-size` | `MAILPEEK_MAX_STORE_SIZE` | `256MB` |
 | `--smtp-auth` | `MAILPEEK_SMTP_AUTH` | off; `user:password` requires that SMTP login |
 | `--ui-auth` | `MAILPEEK_UI_AUTH` | off; `user:password` protects the Web UI and API (HTTP Basic for API clients) |
 | `--smtp-tls` | `MAILPEEK_SMTP_TLS` | off; `true` offers STARTTLS with a self-signed certificate (clients must skip verification) |
 | `--smtp-tls-cert`, `--smtp-tls-key` | `MAILPEEK_SMTP_TLS_CERT`, `MAILPEEK_SMTP_TLS_KEY` | PEM files for STARTTLS |
+| `--data-dir` | `MAILPEEK_DATA_DIR` | off (memory only); a directory keeps messages across restarts. Docker: `-e MAILPEEK_DATA_DIR=/data -v mailpeek-data:/data` |
 
 In Docker use the same port inside and outside: `-e MAILPEEK_SMTP_PORT=1027 -p 1027:1027`.
 
@@ -94,7 +95,7 @@ In Docker use the same port inside and outside: `-e MAILPEEK_SMTP_PORT=1027 -p 1
 - A binary Mailpeek is not reachable from a container or another machine: it listens on localhost only; start it with `--host 0.0.0.0`.
 - A containerized app cannot connect to `localhost:1026`: inside a container `localhost` is the container itself; use the Compose service name (`mailpeek`) or `host.docker.internal`.
 - "530 Authentication required": Mailpeek runs with `--smtp-auth`; configure the same user and password in the app (`mailpeek send --auth user:password`).
-- Messages disappeared: they live in memory, and the oldest are removed beyond `MAILPEEK_MAX_MESSAGES` (see `evicted` in `GET /api/v1/info`).
+- Messages disappeared: without `MAILPEEK_DATA_DIR` they live in memory and are gone after a restart; in any case the oldest are removed beyond `MAILPEEK_MAX_MESSAGES` (see `evicted` in `GET /api/v1/info`).
 - Web UI says "not built": the binary came from `go install`; use a release binary or the Docker image.
 - Building from this repository instead: `make build` (needs Go 1.25+ and Node 20.19+), then `./bin/mailpeek`. After code changes, a Compose container needs `docker compose up -d --build`.
 

@@ -21,15 +21,15 @@ SMTP_PORT=1026
 
 Open **http://localhost:8026**. New emails appear instantly.
 
-No TLS and no credentials are needed. If your mailer insists on authenticating, any username and password is accepted. Mailpeek never delivers or relays mail anywhere, and messages live in memory only.
+No TLS and no credentials are needed. If your mailer insists on authenticating, any username and password is accepted. Mailpeek never delivers or relays mail anywhere. Messages live in memory unless you [keep them in a volume](#keeping-emails-across-restarts).
 
 ## Tags
 
 | Tag | Meaning |
 | --- | --- |
 | `latest` | Latest release |
-| `0.1` | Latest `0.1.x` release |
-| `0.1.1` | Exact version |
+| `0.2` | Latest `0.2.x` release |
+| `0.2.0` | Exact version |
 
 Images are published for `linux/amd64` and `linux/arm64`. The image is built `FROM scratch`: just the static binary, running as an unprivileged user.
 
@@ -48,6 +48,18 @@ docker run --rm \
   -p 1027:1027 -p 8027:8027 \
   4ndbrslz/mailpeek
 ```
+
+## Keeping emails across restarts
+
+Off by default. Point `MAILPEEK_DATA_DIR` at a volume and messages are loaded again after a restart or `docker compose down`:
+
+```bash
+docker run --rm -p 1026:1026 -p 8026:8026 \
+  -e MAILPEEK_DATA_DIR=/data -v mailpeek-data:/data \
+  4ndbrslz/mailpeek
+```
+
+Each message is a plain `.eml` file plus a small `.json`. The image has `/data` ready for a named volume; a bind mount must be writable by uid 65534.
 
 ## Docker Compose
 
@@ -122,12 +134,13 @@ Zero config by default. Every setting is an environment variable:
 | --- | --- |
 | `MAILPEEK_SMTP_PORT` | `1026` |
 | `MAILPEEK_HTTP_PORT` | `8026` |
-| `MAILPEEK_MAX_MESSAGES` | `100` (oldest removed first) |
+| `MAILPEEK_MAX_MESSAGES` | `1000` (oldest removed first) |
 | `MAILPEEK_MAX_MESSAGE_SIZE` | `10MB` |
 | `MAILPEEK_MAX_STORE_SIZE` | `256MB` (oldest removed first) |
 | `MAILPEEK_SMTP_AUTH` | off; `user:password` requires an SMTP login |
 | `MAILPEEK_UI_AUTH` | off; `user:password` protects the Web UI and API |
 | `MAILPEEK_SMTP_TLS` | off; `true` offers STARTTLS with a self-signed certificate |
+| `MAILPEEK_DATA_DIR` | off (memory only); a directory keeps messages across restarts |
 
 For large parallel suites in CI, raise `MAILPEEK_MAX_MESSAGES` (for example `5000`) so no email is removed before a test reads it.
 

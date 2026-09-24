@@ -1,5 +1,10 @@
 # Mailpeek
 
+[![CI](https://github.com/andbrslz/mailpeek/actions/workflows/ci.yml/badge.svg)](https://github.com/andbrslz/mailpeek/actions/workflows/ci.yml)
+[![npm](https://img.shields.io/npm/v/@mailpeek-dev/playwright?label=%40mailpeek-dev%2Fplaywright)](https://www.npmjs.com/package/@mailpeek-dev/playwright)
+[![Docker pulls](https://img.shields.io/docker/pulls/4ndbrslz/mailpeek)](https://hub.docker.com/r/4ndbrslz/mailpeek)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+
 **Email testing for developers.**
 
 Catch emails locally.
@@ -47,7 +52,26 @@ await page.goto(email.findLink("Activate account").href);
 
 Setting it up with an AI coding agent? Point it at [`llms.txt`](llms.txt): install, app settings for common frameworks, verification and troubleshooting on one page.
 
-Both modes use the same server: SMTP → MIME parser → in-memory store → event broker, consumed by the Web UI (REST + SSE) and by the SDK (REST + wait API).
+Both modes use the same server: SMTP → MIME parser → in-memory store (optionally mirrored to a directory) → event broker, consumed by the Web UI (REST + SSE) and by the SDK (REST + wait API).
+
+**Status:** 0.x. Mailpeek is young and developed by one maintainer. The REST API, the SDK and the CLI flags may still change between minor versions; every change is listed in the [changelog](CHANGELOG.md). Bug reports and feedback are very welcome in [issues](https://github.com/andbrslz/mailpeek/issues).
+
+---
+
+## Scope and alternatives
+
+Mailpeek does one thing: catch emails so you can look at them and assert on them in tests. It never sends mail anywhere.
+
+| | Mailpeek | [Mailpit](https://github.com/axllent/mailpit) | [MailHog](https://github.com/mailhog/MailHog) |
+| --- | --- | --- | --- |
+| Actively maintained | yes | yes | no (last release in 2020) |
+| First-party Playwright fixture and TypeScript client (`waitForEmail`, isolated inbox per test) | yes | no (REST API) | no (REST API) |
+| Simulate SMTP failures to test retries | yes | yes | yes |
+| Keep messages across restarts | optional (`--data-dir`) | yes (SQLite) | optional (MongoDB, maildir) |
+| Relay / release to a real SMTP server | no, on purpose | yes | yes |
+| POP3 or IMAP access | no, on purpose | POP3 | no |
+
+Choose **Mailpit** if you need to relay emails, read them with a mail client over POP3, or run spam and HTML compatibility checks. Choose **Mailpeek** when the main job is automated tests of the emails your application sends.
 
 ---
 
@@ -418,7 +442,7 @@ See [`examples/docker-compose`](examples/docker-compose) for a runnable version.
 
 ### Capacity for large suites
 
-Mailpeek keeps at most `MAILPEEK_MAX_MESSAGES` messages (100) and `MAILPEEK_MAX_STORE_SIZE` bytes (256 MB) and removes the **oldest** first. A busy parallel suite can push out an email that a slower test is still waiting for. In CI:
+Mailpeek keeps at most `MAILPEEK_MAX_MESSAGES` messages (1000) and `MAILPEEK_MAX_STORE_SIZE` bytes (256 MB) and removes the **oldest** first. A busy parallel suite can push out an email that a slower test is still waiting for. In CI:
 
 - Raise the limits to cover a full run, e.g. `MAILPEEK_MAX_MESSAGES=5000`. Typical emails are a few KB, so 5000 fit easily in the default 256 MB.
 - Keep the default `mailpeekCleanup: "passed"`: passing tests clear their inboxes as they finish, so the store holds only what is still needed.
@@ -434,7 +458,7 @@ Zero config by default. CLI flags take precedence over environment variables.
 | -------------------- | --------------------------- | --------- |
 | `--smtp-port`        | `MAILPEEK_SMTP_PORT`        | `1026`    |
 | `--http-port`        | `MAILPEEK_HTTP_PORT`        | `8026`    |
-| `--max-messages`     | `MAILPEEK_MAX_MESSAGES`     | `100` (oldest removed first) |
+| `--max-messages`     | `MAILPEEK_MAX_MESSAGES`     | `1000` (oldest removed first) |
 | `--max-message-size` | `MAILPEEK_MAX_MESSAGE_SIZE` | `10MB`    |
 | `--max-store-size`   | `MAILPEEK_MAX_STORE_SIZE`   | `256MB` (memory for all messages; oldest removed first) |
 | `--host`             | `MAILPEEK_HOST`             | `localhost` (this machine only; the Docker image uses `0.0.0.0`) |
@@ -442,9 +466,10 @@ Zero config by default. CLI flags take precedence over environment variables.
 | `--ui-auth`          | `MAILPEEK_UI_AUTH`          | off (open)                |
 | `--smtp-tls`         | `MAILPEEK_SMTP_TLS`         | off; `true` offers STARTTLS with a self-signed certificate |
 | `--smtp-tls-cert`, `--smtp-tls-key` | `MAILPEEK_SMTP_TLS_CERT`, `MAILPEEK_SMTP_TLS_KEY` | off; PEM files for STARTTLS instead of the self-signed certificate |
+| `--data-dir`         | `MAILPEEK_DATA_DIR`         | off (memory only); see [Keeping emails across restarts](#keeping-emails-across-restarts) |
 
 ```bash
-mailpeek --smtp-port 1026 --http-port 8026 --max-messages 100
+mailpeek --smtp-port 1026 --http-port 8026 --max-messages 1000
 ```
 
 The binary only accepts connections from this machine (`127.0.0.1` and `::1`), so captured emails stay private on shared networks. Use `--host 0.0.0.0` when other machines, or an application in a container, must reach a Mailpeek running outside Docker. The Docker image already listens on all interfaces, which the container needs.
@@ -498,7 +523,19 @@ Other commands:
 - `mailpeek healthcheck` exits 0 when the HTTP server is healthy (used by the Docker `HEALTHCHECK`).
 - `mailpeek version`.
 
-Messages live in memory only and are gone when Mailpeek stops.
+### Keeping emails across restarts
+
+By default messages live in memory only and are gone when Mailpeek stops, which is what a test run wants. For day-to-day development, `--data-dir` (or `MAILPEEK_DATA_DIR`) keeps them in a directory and loads them again at startup:
+
+```bash
+mailpeek --data-dir ./emails
+
+docker run --rm -p 1026:1026 -p 8026:8026 \
+  -e MAILPEEK_DATA_DIR=/data -v mailpeek-data:/data \
+  4ndbrslz/mailpeek
+```
+
+Each message is stored as `<id>.eml`, the original email that any mail client opens, next to `<id>.json` with its envelope and arrival time. Deleting, clearing and the limits (`--max-messages`, `--max-store-size`) apply to the directory too, and a restart with smaller limits keeps only the newest messages. The banner shows the directory and how many messages were loaded. With a bind mount (`-v ./emails:/data`) the directory must be writable by the container user (uid 65534).
 
 ---
 
@@ -573,7 +610,7 @@ Mailpeek is a development tool: do not expose it to the internet. Authentication
 - **No relay.** Every recipient is accepted, and nothing is ever delivered or forwarded.
 - **HTML never runs.** Previews render in an `<iframe sandbox>` without `allow-scripts` or `allow-same-origin`, under a Content-Security-Policy that only allows Mailpeek's own scripts. Links found in emails are never fetched.
 - **Local by default.** The binary listens on `127.0.0.1` and `::1` only, so other machines on the network cannot read captured emails unless you pass `--host 0.0.0.0` (the Docker image does, inside the container).
-- **Safe attachments.** Downloads use `Content-Disposition: attachment` with a sanitized filename, `X-Content-Type-Options: nosniff` and `Content-Security-Policy: sandbox`. Only PNG, JPEG, GIF, WebP, AVIF and BMP images can be opened in the browser (never SVG or HTML). Attachments are looked up by ID in memory, never on disk, so there is no path traversal.
+- **Safe attachments.** Downloads use `Content-Disposition: attachment` with a sanitized filename, `X-Content-Type-Options: nosniff` and `Content-Security-Policy: sandbox`. Only PNG, JPEG, GIF, WebP, AVIF and BMP images can be opened in the browser (never SVG or HTML). Attachments are looked up by ID in memory, never by a path taken from the request, so there is no path traversal.
 - **Limits.** Maximum message size (`SIZE` is advertised and enforced), a total memory budget for stored messages (`--max-store-size`), at most 100 simultaneous SMTP connections (more get `421`), bounded concurrent MIME parsing, 100 recipients per message, bounded SMTP line length, idle/data/write timeouts on SMTP, header/read/write/idle timeouts and a 64 KB header limit on HTTP, and disconnection after repeated protocol errors.
 - **Graceful shutdown** on `SIGINT`/`SIGTERM`: SMTP stops accepting and finishes in-flight messages, SSE streams and pending wait requests end, and HTTP drains.
 
@@ -599,7 +636,7 @@ cmd/mailpeek        entry point, CLI, banner, healthcheck command
 internal/config     defaults < environment < flags
 internal/smtp       receive-only SMTP server
 internal/mail       Message model, MIME parser, link extraction
-internal/store      bounded in-memory store and filters
+internal/store      bounded in-memory store, filters and the optional data directory
 internal/events     in-memory pub/sub broker
 internal/api        REST, wait API, SSE, embedded UI
 internal/app        wiring and graceful shutdown
@@ -644,7 +681,11 @@ The Web UI's own conventions (presentational components, logic in hooks and cont
 
 ### Not included (on purpose)
 
-No database, Redis, user accounts, relay/forwarding, IMAP/POP3, WebSockets, GraphQL or plugins. Messages are kept in memory.
+No database, Redis, user accounts, relay/forwarding, IMAP/POP3, WebSockets, GraphQL or plugins. Messages are kept in memory, optionally mirrored to plain files with `--data-dir`. See [Scope and alternatives](#scope-and-alternatives).
+
+### Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md). Security issues: [SECURITY.md](SECURITY.md).
 
 ## License
 
