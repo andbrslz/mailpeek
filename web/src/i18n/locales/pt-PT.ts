@@ -37,6 +37,7 @@ export const ptPT: Messages = {
   "width.desktop": "Largura de computador",
   "width.mobile": "Largura de telemóvel (375px)",
   "raw.loading": "A carregar…",
+  "attachments.preview": "Pré-visualização de {name}",
   "list.loadingMore": "A carregar mais…",
   "attachments.download": "Transferir",
   "links.none": "Nenhuma ligação encontrada.",

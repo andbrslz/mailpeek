@@ -97,6 +97,8 @@ export const enUS = {
 
   "attachments.none": "No attachments.",
   "attachments.download": "Download",
+  "attachments.open": "Open",
+  "attachments.preview": "Preview of {name}",
   "attachments.inline": "inline",
 
   "links.none": "No links found.",

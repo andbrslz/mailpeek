@@ -3,6 +3,7 @@ package smtp
 import (
 	"bufio"
 	"bytes"
+	"crypto/tls"
 	"encoding/base64"
 	"errors"
 	"fmt"
@@ -11,6 +12,8 @@ import (
 	"strings"
 	"sync/atomic"
 	"time"
+
+	"github.com/mailpeek/mailpeek/internal/config"
 )
 
 const maxErrors = 10
@@ -31,6 +34,7 @@ type session struct {
 
 	helo     string
 	authed   bool
+	tls      bool
 	hasFrom  bool
 	from     string
 	rcpts    []string
@@ -89,7 +93,9 @@ func (c *session) handle(verb, arg string) bool {
 		return c.reply(214, "2.0.0 Mailpeek accepts all mail for inspection")
 	case "AUTH":
 		return c.auth(arg)
-	case "STARTTLS", "EXPN", "TURN", "ETRN", "BDAT":
+	case "STARTTLS":
+		return c.startTLS(arg)
+	case "EXPN", "TURN", "ETRN", "BDAT":
 		return c.fail(502, "5.5.1 Command not implemented")
 	}
 	return c.fail(500, "5.5.2 Command not recognized")
@@ -104,15 +110,44 @@ func (c *session) hello(verb, arg string) bool {
 	if verb == "HELO" {
 		return c.reply(250, c.srv.hostname())
 	}
-	return c.reply(250,
-		c.srv.hostname()+" greets "+arg,
-		"SIZE "+strconv.FormatInt(c.srv.maxSize(), 10),
+	lines := []string{
+		c.srv.hostname() + " greets " + arg,
+		"SIZE " + strconv.FormatInt(c.srv.maxSize(), 10),
 		"8BITMIME",
 		"SMTPUTF8",
 		"PIPELINING",
-		"AUTH PLAIN LOGIN",
-		"HELP",
-	)
+	}
+	if c.srv.TLSConfig != nil && !c.tls {
+		lines = append(lines, "STARTTLS")
+	}
+	return c.reply(250, append(lines, "AUTH PLAIN LOGIN", "HELP")...)
+}
+
+func (c *session) startTLS(arg string) bool {
+	switch {
+	case c.srv.TLSConfig == nil:
+		return c.fail(502, "5.5.1 Command not implemented")
+	case c.tls:
+		return c.fail(503, "5.5.1 TLS already active")
+	case arg != "":
+		return c.fail(501, "5.5.4 Syntax: STARTTLS")
+	}
+	if !c.reply(220, "2.0.0 Ready to start TLS") {
+		return false
+	}
+	conn := tls.Server(c.conn, c.srv.TLSConfig)
+	_ = c.conn.SetDeadline(time.Now().Add(c.srv.readTimeout()))
+	if err := conn.Handshake(); err != nil {
+		c.srv.note("TLS handshake with %s failed (a client that verifies certificates needs --smtp-tls-cert, "+
+			"or certificate verification turned off): %v", c.remote(), err)
+		return false
+	}
+	c.r = bufio.NewReaderSize(conn, 4096)
+	c.w = bufio.NewWriter(conn)
+	c.tls = true
+	c.helo, c.authed = "", false
+	c.reset()
+	return true
 }
 
 func (c *session) mail(arg string) bool {
@@ -120,6 +155,7 @@ func (c *session) mail(arg string) bool {
 		return c.fail(503, "5.5.1 Send HELO/EHLO first")
 	}
 	if c.srv.Auth != nil && !c.authed {
+		c.srv.note("rejected mail from %s: SMTP login required (Mailpeek runs with --smtp-auth)", c.remote())
 		return c.fail(530, "5.7.0 Authentication required")
 	}
 	if c.hasFrom {
@@ -133,6 +169,8 @@ func (c *session) mail(arg string) bool {
 		k, v, _ := strings.Cut(p, "=")
 		if strings.EqualFold(k, "SIZE") {
 			if n, err := strconv.ParseInt(v, 10, 64); err == nil && n > c.srv.maxSize() {
+				c.srv.note("rejected mail from %s: announced size %d bytes is over --max-message-size (%s)",
+					c.remote(), n, config.FormatSize(c.srv.maxSize()))
 				return c.fail(552, "5.3.4 Message size exceeds fixed limit")
 			}
 		}
@@ -152,6 +190,9 @@ func (c *session) rcpt(arg string) bool {
 	if len(c.rcpts) >= c.srv.maxRecipients() {
 		return c.reply(452, "4.5.3 Too many recipients")
 	}
+	if code, msg, ok := c.rejected("rcpt", []string{addr}); ok {
+		return c.reply(code, msg)
+	}
 	c.rcpts = append(c.rcpts, addr)
 	return c.reply(250, "2.1.5 OK")
 }
@@ -166,6 +207,8 @@ func (c *session) data() bool {
 	_ = c.conn.SetReadDeadline(time.Now().Add(c.srv.dataTimeout()))
 	body, err := readData(c.r, c.srv.maxSize())
 	if errors.Is(err, errTooLarge) {
+		c.srv.note("rejected message from %s to %s: over --max-message-size (%s)",
+			c.remote(), strings.Join(c.rcpts, ", "), config.FormatSize(c.srv.maxSize()))
 		c.reset()
 		return c.reply(552, "5.3.4 Message size exceeds fixed limit")
 	}
@@ -173,8 +216,11 @@ func (c *session) data() bool {
 		return false
 	}
 
-	env := Envelope{From: c.from, To: c.rcpts, RemoteAddr: c.conn.RemoteAddr().String()}
+	env := Envelope{From: c.from, To: c.rcpts, RemoteAddr: c.conn.RemoteAddr().String(), TLS: c.tls}
 	c.reset()
+	if code, msg, ok := c.rejected("data", env.To); ok {
+		return c.reply(code, msg)
+	}
 	id, err := c.srv.Handler(env, body)
 	if err != nil {
 		c.srv.logf("smtp: handler: %v", err)
@@ -220,6 +266,7 @@ func (c *session) auth(arg string) bool {
 		return false
 	}
 	if c.srv.Auth != nil && !c.srv.Auth(user, password) {
+		c.srv.note("SMTP login failed for user %q from %s: wrong username or password", user, c.remote())
 		return c.fail(535, "5.7.8 Authentication credentials invalid")
 	}
 	c.authed = true
@@ -249,6 +296,15 @@ func (c *session) challenge(initial, prompt string) ([]byte, error) {
 	}
 	return b, nil
 }
+
+func (c *session) rejected(stage string, to []string) (int, string, bool) {
+	if c.srv.Reject == nil {
+		return 0, "", false
+	}
+	return c.srv.Reject(stage, to)
+}
+
+func (c *session) remote() string { return c.conn.RemoteAddr().String() }
 
 func (c *session) reset() {
 	c.hasFrom, c.from, c.rcpts = false, "", nil

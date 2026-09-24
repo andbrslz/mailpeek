@@ -67,10 +67,37 @@ export interface MessageFilter {
   /** From header or SMTP envelope sender. */
   from?: string;
   subject?: string;
-  /** Matches subject, from or to. */
+  /** Text or HTML body. */
+  body?: string;
+  /** Matches subject, from, to or body. */
   q?: string;
   /** Only messages received at or after this moment. */
   since?: Date | string | number;
+}
+
+/** Makes upcoming SMTP deliveries fail; see `Mailpeek.failNext`. */
+export interface FailureOptions {
+  /** `"rcpt"` refuses the recipient; `"data"` (default) refuses the message after it was sent. */
+  stage?: "rcpt" | "data";
+  /** SMTP reply code, 400-599 (default 451, a temporary failure). */
+  code?: number;
+  /** Reply text after the code (single line). */
+  message?: string;
+  /** Only deliveries to this exact address (default: any recipient). */
+  address?: string;
+  /** How many deliveries fail (default 1). */
+  count?: number;
+}
+
+/** A pending simulated SMTP failure. */
+export interface SmtpFailure {
+  id: string;
+  stage: "rcpt" | "data";
+  code: number;
+  message: string;
+  address?: string;
+  /** Deliveries it still applies to; the rule is removed at zero. */
+  remaining: number;
 }
 
 export interface RequestOptions {

@@ -187,8 +187,13 @@ func (s *Server) attachment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h := w.Header()
-	h.Set("Content-Type", safeContentType(a.ContentType))
-	h.Set("Content-Disposition", contentDisposition(a.Filename))
+	contentType := safeContentType(a.ContentType)
+	h.Set("Content-Type", contentType)
+	if r.URL.Query().Get("inline") != "" && previewable[contentType] {
+		h.Set("Content-Disposition", disposition("inline", a.Filename))
+	} else {
+		h.Set("Content-Disposition", contentDisposition(a.Filename))
+	}
 	h.Set("Content-Length", strconv.Itoa(len(a.Data)))
 	h.Set("Content-Security-Policy", "sandbox")
 	h.Set("Cache-Control", "private, max-age=3600")
@@ -203,11 +208,22 @@ func safeContentType(ct string) string {
 	return mediaType
 }
 
-func contentDisposition(filename string) string {
-	if v := mime.FormatMediaType("attachment", map[string]string{"filename": SafeFilename(filename)}); v != "" {
+var previewable = map[string]bool{
+	"image/png":  true,
+	"image/jpeg": true,
+	"image/gif":  true,
+	"image/webp": true,
+	"image/avif": true,
+	"image/bmp":  true,
+}
+
+func contentDisposition(filename string) string { return disposition("attachment", filename) }
+
+func disposition(kind, filename string) string {
+	if v := mime.FormatMediaType(kind, map[string]string{"filename": SafeFilename(filename)}); v != "" {
 		return v
 	}
-	return "attachment"
+	return kind
 }
 
 func SafeFilename(name string) string {

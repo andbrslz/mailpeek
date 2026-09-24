@@ -12,6 +12,7 @@ type Filter struct {
 	Address string
 	From    string
 	Subject string
+	Body    string
 	Query   string
 	Since   time.Time
 }
@@ -34,9 +35,12 @@ func (f Filter) Match(m *mail.Message) bool {
 	if f.Subject != "" && !contains(m.Subject, lower(f.Subject)) {
 		return false
 	}
+	if f.Body != "" && !matchBody(m, lower(f.Body)) {
+		return false
+	}
 	if f.Query != "" {
 		q := lower(f.Query)
-		if !contains(m.Subject, q) && !matchFrom(m, q) && !matchTo(m, q) {
+		if !contains(m.Subject, q) && !matchFrom(m, q) && !matchTo(m, q) && !matchBody(m, q) {
 			return false
 		}
 	}
@@ -74,6 +78,10 @@ func hasRecipient(m *mail.Message, address string) bool {
 		}
 	}
 	return false
+}
+
+func matchBody(m *mail.Message, needle string) bool {
+	return contains(m.Text, needle) || contains(m.HTML, needle)
 }
 
 func matchFrom(m *mail.Message, needle string) bool {

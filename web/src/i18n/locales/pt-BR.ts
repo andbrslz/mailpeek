@@ -88,6 +88,8 @@ export const ptBR: Messages = {
   "copy.copied": "Copiado",
   "attachments.none": "Sem anexos.",
   "attachments.download": "Baixar",
+  "attachments.open": "Abrir",
+  "attachments.preview": "Prévia de {name}",
   "attachments.inline": "incorporado",
   "links.none": "Nenhum link encontrado.",
   "links.noText": "(sem texto)",

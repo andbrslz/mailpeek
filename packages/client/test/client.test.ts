@@ -96,8 +96,8 @@ describe("Mailpeek", () => {
       return json({ status: "ok" });
     });
     const client = new Mailpeek({ fetch });
-    expect(await client.clear({ to: "x@y" })).toBe(3);
-    expect(calls[0]!.url.search).toBe("?to=x%40y");
+    expect(await client.clear({ to: "x@y", body: "481516" })).toBe(3);
+    expect(calls[0]!.url.search).toBe("?to=x%40y&body=481516");
     await client.delete("a/b");
     expect(calls[1]!.url.pathname).toBe("/api/v1/messages/a%2Fb");
     expect(await client.raw("1")).toContain("From: a@b");
@@ -259,6 +259,37 @@ describe("timeout diagnostics", () => {
     expect(String(err)).toMatch(/holds no messages at all/);
   });
 
+  it("simulates SMTP failures, scoped to an inbox", async () => {
+    const { fetch, calls } = fakeFetch((url, init) => {
+      if (init.method === "POST") {
+        return json({ id: "1", remaining: 2, ...JSON.parse(String(init.body)) }, 201);
+      }
+      if (init.method === "DELETE") return json({ deleted: 1 });
+      return json({ failures: [] });
+    });
+    const client = new Mailpeek({ fetch, auth: { username: "u", password: "p" } });
+
+    const rule = await client.failNext({ code: 550, stage: "rcpt", count: 2 });
+    expect(rule).toMatchObject({ id: "1", code: 550, stage: "rcpt" });
+    const headers = calls[0]!.init.headers as Record<string, string>;
+    expect(headers["Content-Type"]).toBe("application/json");
+    expect(headers.Authorization).toMatch(/^Basic /);
+    expect(calls[0]!.url.pathname).toBe("/api/v1/smtp/failures");
+
+    const inbox = client.inbox("ana@example.com");
+    await inbox.failNext({ code: 451 });
+    expect(JSON.parse(String(calls[1]!.init.body))).toEqual({
+      code: 451,
+      address: "ana@example.com",
+    });
+
+    await inbox.clear();
+    const cleared = calls.slice(2).map((c) => `${c.init.method} ${c.url.pathname}${c.url.search}`);
+    expect(cleared).toContain("DELETE /api/v1/smtp/failures?address=ana%40example.com");
+    expect(cleared).toContain("DELETE /api/v1/messages?address=ana%40example.com");
+    expect(await client.smtpFailures()).toEqual([]);
+  });
+
   it("explainMismatch mirrors the server filters", () => {
     const m = summary("Invoice", "john@x.test", "2024-01-01T00:00:00Z");
     expect(explainMismatch(m, { to: "john" })).toEqual([]);
@@ -267,6 +298,10 @@ describe("timeout diagnostics", () => {
       "received before `since`",
     ]);
     expect(explainMismatch(m, { q: "nothing" })[0]).toMatch(/does not match/);
+    expect(explainMismatch(m, { to: "john", body: "481516" })).toEqual([
+      'body does not contain "481516"',
+    ]);
+    expect(explainMismatch(m, { to: "jane", body: "481516" })).toHaveLength(1);
   });
 });
 

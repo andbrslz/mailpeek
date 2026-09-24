@@ -147,6 +147,9 @@
             "$ref": "#/components/parameters/subject"
           },
           {
+            "$ref": "#/components/parameters/body"
+          },
+          {
             "$ref": "#/components/parameters/q"
           },
           {
@@ -237,6 +240,9 @@
             "$ref": "#/components/parameters/subject"
           },
           {
+            "$ref": "#/components/parameters/body"
+          },
+          {
             "$ref": "#/components/parameters/q"
           },
           {
@@ -301,6 +307,9 @@
             "$ref": "#/components/parameters/subject"
           },
           {
+            "$ref": "#/components/parameters/body"
+          },
+          {
             "$ref": "#/components/parameters/q"
           },
           {
@@ -363,6 +372,9 @@
           },
           {
             "$ref": "#/components/parameters/subject"
+          },
+          {
+            "$ref": "#/components/parameters/body"
           },
           {
             "$ref": "#/components/parameters/q"
@@ -432,6 +444,9 @@
           },
           {
             "$ref": "#/components/parameters/subject"
+          },
+          {
+            "$ref": "#/components/parameters/body"
           },
           {
             "$ref": "#/components/parameters/q"
@@ -671,6 +686,14 @@
               "type": "string"
             },
             "description": "Attachment id from Message.attachments."
+          },
+          {
+            "name": "inline",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Any value: display PNG, JPEG, GIF, WebP, AVIF or BMP images in the browser instead of downloading them. Other types are always downloaded."
           }
         ],
         "responses": {
@@ -697,6 +720,210 @@
           },
           "404": {
             "description": "Message or attachment not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/smtp/failures": {
+      "get": {
+        "summary": "Pending simulated SMTP failures",
+        "operationId": "listFailures",
+        "responses": {
+          "200": {
+            "description": "Rules, oldest first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "failures": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/FailureRule"
+                      }
+                    }
+                  },
+                  "required": ["failures"]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Login required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Make upcoming SMTP deliveries fail",
+        "operationId": "addFailure",
+        "description": "The next `count` deliveries matching the rule get the error reply instead of being accepted, so an application's retry and error handling can be tested. Rules apply in the order they were added. Scope a rule with `address` so parallel tests do not affect each other.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "stage": {
+                    "type": "string",
+                    "enum": ["rcpt", "data"],
+                    "default": "data"
+                  },
+                  "code": {
+                    "type": "integer",
+                    "minimum": 400,
+                    "maximum": 599,
+                    "default": 451
+                  },
+                  "message": {
+                    "type": "string",
+                    "description": "Single line. Default: a temporary (4xx) or permanent (5xx) failure text."
+                  },
+                  "address": {
+                    "type": "string"
+                  },
+                  "count": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 10000,
+                    "default": 1
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Rule added",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FailureRule"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid rule or JSON",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Login required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Content-Type must be application/json",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Remove simulated failures",
+        "operationId": "clearFailures",
+        "parameters": [
+          {
+            "name": "address",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Only the rules for this address."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Removed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "deleted": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": ["deleted"]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Login required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/smtp/failures/{id}": {
+      "delete": {
+        "summary": "Remove one simulated failure",
+        "operationId": "deleteFailure",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Removed"
+          },
+          "401": {
+            "description": "Login required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Rule not found",
             "content": {
               "application/json": {
                 "schema": {
@@ -756,7 +983,7 @@
         "schema": {
           "type": "string"
         },
-        "description": "Substring of subject, from or to."
+        "description": "Substring of subject, from, to or body."
       },
       "since": {
         "name": "since",
@@ -765,6 +992,14 @@
           "type": "string"
         },
         "description": "Received at or after: RFC 3339 or Unix milliseconds."
+      },
+      "body": {
+        "name": "body",
+        "in": "query",
+        "schema": {
+          "type": "string"
+        },
+        "description": "Substring of the text or HTML body."
       }
     },
     "schemas": {
@@ -1029,6 +1264,10 @@
               }
             },
             "required": ["messages", "bytes", "evicted"]
+          },
+          "smtpTls": {
+            "type": "boolean",
+            "description": "SMTP offers STARTTLS."
           }
         },
         "required": [
@@ -1040,8 +1279,40 @@
           "maxStoreSize",
           "smtpAuth",
           "uiAuth",
-          "store"
+          "store",
+          "smtpTls"
         ]
+      },
+      "FailureRule": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "stage": {
+            "type": "string",
+            "enum": ["rcpt", "data"],
+            "description": "rcpt: the RCPT TO command is refused. data: the message is refused after it was sent (not stored)."
+          },
+          "code": {
+            "type": "integer",
+            "minimum": 400,
+            "maximum": 599
+          },
+          "message": {
+            "type": "string",
+            "description": "Reply text after the code."
+          },
+          "address": {
+            "type": "string",
+            "description": "Only for this recipient (exact, case-insensitive); absent for any recipient."
+          },
+          "remaining": {
+            "type": "integer",
+            "description": "How many more times the rule applies; it is removed at zero."
+          }
+        },
+        "required": ["id", "stage", "code", "message", "remaining"]
       }
     }
   }

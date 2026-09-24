@@ -1,5 +1,12 @@
 import type { Email } from "./email.js";
-import type { MessageFilter, MessageSummary, RequestOptions, WaitOptions } from "./types.js";
+import type {
+  FailureOptions,
+  MessageFilter,
+  MessageSummary,
+  RequestOptions,
+  SmtpFailure,
+  WaitOptions,
+} from "./types.js";
 
 /** The subset of the client an Inbox needs. */
 export interface InboxClient {
@@ -8,6 +15,8 @@ export interface InboxClient {
   waitFor(options?: WaitOptions): Promise<Email>;
   waitForEmails(count: number, options?: WaitOptions): Promise<Email[]>;
   clear(filter?: MessageFilter, options?: RequestOptions): Promise<number>;
+  failNext(failure?: FailureOptions, options?: RequestOptions): Promise<SmtpFailure>;
+  clearFailures(address?: string, options?: RequestOptions): Promise<number>;
 }
 
 type InboxFilter = Omit<MessageFilter, "address" | "to">;
@@ -58,9 +67,25 @@ export class Inbox {
     return this.client.waitForEmails(count, { ...options, address: this.address });
   }
 
-  /** Deletes this inbox's emails and returns how many were removed. */
-  clear(options?: RequestOptions): Promise<number> {
-    return this.client.clear({ address: this.address }, options);
+  /**
+   * Makes the next `count` deliveries to this inbox fail (default: one, with
+   * 451), so the application's retry or error handling can be tested. Other
+   * inboxes are not affected.
+   */
+  failNext(
+    failure: Omit<FailureOptions, "address"> = {},
+    options?: RequestOptions,
+  ): Promise<SmtpFailure> {
+    return this.client.failNext({ ...failure, address: this.address }, options);
+  }
+
+  /** Deletes this inbox's emails (and pending failures) and returns how many emails were removed. */
+  async clear(options?: RequestOptions): Promise<number> {
+    const [deleted] = await Promise.all([
+      this.client.clear({ address: this.address }, options),
+      this.client.clearFailures(this.address, options),
+    ]);
+    return deleted;
   }
 
   toString(): string {

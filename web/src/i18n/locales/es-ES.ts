@@ -89,6 +89,8 @@ export const esES: Messages = {
   "copy.copied": "Copiado",
   "attachments.none": "Sin adjuntos.",
   "attachments.download": "Descargar",
+  "attachments.open": "Abrir",
+  "attachments.preview": "Vista previa de {name}",
   "attachments.inline": "incrustado",
   "links.none": "No se encontraron enlaces.",
   "links.noText": "(sin texto)",

@@ -2,19 +2,23 @@ package app
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"io/fs"
 	"log"
 	"net"
 	"net/http"
+	"os"
 	"runtime"
+	"strings"
 	"syscall"
 	"time"
 
 	"github.com/mailpeek/mailpeek/internal/api"
 	"github.com/mailpeek/mailpeek/internal/config"
 	"github.com/mailpeek/mailpeek/internal/events"
+	"github.com/mailpeek/mailpeek/internal/failures"
 	"github.com/mailpeek/mailpeek/internal/mail"
 	"github.com/mailpeek/mailpeek/internal/smtp"
 	"github.com/mailpeek/mailpeek/internal/store"
@@ -31,6 +35,8 @@ type App struct {
 	cancelBase     context.CancelFunc
 	errs           chan error
 	parsing        chan struct{}
+	activity       *log.Logger
+	failures       *failures.Set
 }
 
 func New(cfg config.Config, ui fs.FS, version string, logger *log.Logger) *App {
@@ -44,8 +50,10 @@ func New(cfg config.Config, ui fs.FS, version string, logger *log.Logger) *App {
 		parsing: make(chan struct{}, max(2, runtime.NumCPU())),
 	}
 
+	a.failures = &failures.Set{}
 	a.smtp = &smtp.Server{
 		Handler:        a.receive,
+		Reject:         a.reject,
 		MaxMessageSize: cfg.MaxMessageSize,
 		ErrorLog:       logger,
 	}
@@ -68,7 +76,8 @@ func New(cfg config.Config, ui fs.FS, version string, logger *log.Logger) *App {
 			MaxMessageSize: cfg.MaxMessageSize,
 			MaxStoreSize:   cfg.MaxStoreSize,
 			SMTPAuth:       cfg.SMTPAuth.Enabled(),
-		}, uiAuth),
+			SMTPTLS:        cfg.SMTPTLS,
+		}, uiAuth).WithFailures(a.failures),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       30 * time.Second,
 		WriteTimeout:      30 * time.Second,
@@ -85,15 +94,74 @@ func (a *App) receive(env smtp.Envelope, data []byte) (string, error) {
 	m := mail.Parse(data, mail.Envelope{From: env.From, To: env.To})
 	<-a.parsing
 	a.store.Save(m, data)
+	if a.activity != nil {
+		secure := ""
+		if env.TLS {
+			secure = ", TLS"
+		}
+		a.activity.Printf("received %s from %s to %s %q (%s%s)",
+			m.ID, orNone(env.From), strings.Join(env.To, ", "), m.Subject, humanSize(len(data)), secure)
+	}
 	return m.ID, nil
+}
+
+func (a *App) reject(stage string, to []string) (int, string, bool) {
+	r, ok := a.failures.Take(stage, to)
+	if !ok {
+		return 0, "", false
+	}
+	if a.activity != nil {
+		a.activity.Printf("simulated failure %d at %s for %s (rule %s, %d left)",
+			r.Code, strings.ToUpper(stage), strings.Join(to, ", "), r.ID, r.Remaining)
+	}
+	return r.Code, r.Message, true
+}
+
+func (a *App) tlsConfig() (*tls.Config, error) {
+	if a.cfg.SMTPTLSCert != "" {
+		cert, err := tls.LoadX509KeyPair(a.cfg.SMTPTLSCert, a.cfg.SMTPTLSKey)
+		if err != nil {
+			return nil, fmt.Errorf("smtp-tls-cert/smtp-tls-key: %w", err)
+		}
+		return smtp.TLSConfig(cert), nil
+	}
+	hostname, _ := os.Hostname()
+	return smtp.SelfSignedTLS("localhost", "127.0.0.1", "::1", "mailpeek", hostname, a.cfg.Host)
+}
+
+func (a *App) SetActivityLog(l *log.Logger) {
+	a.activity = l
+	a.smtp.ActivityLog = l
+}
+
+func orNone(s string) string {
+	if s == "" {
+		return "<>"
+	}
+	return s
+}
+
+func humanSize(n int) string {
+	switch {
+	case n >= 1<<20:
+		return fmt.Sprintf("%.1f MB", float64(n)/(1<<20))
+	case n >= 1<<10:
+		return fmt.Sprintf("%.1f KB", float64(n)/(1<<10))
+	}
+	return fmt.Sprintf("%d B", n)
 }
 
 func (a *App) Start() error {
 	var err error
-	if a.smtpLn, err = net.Listen("tcp", a.cfg.SMTPAddr()); err != nil {
+	if a.cfg.SMTPTLS {
+		if a.smtp.TLSConfig, err = a.tlsConfig(); err != nil {
+			return err
+		}
+	}
+	if a.smtpLn, err = listen(a.cfg.Host, a.cfg.SMTPPort); err != nil {
 		return listenError("SMTP", a.cfg.SMTPPort, "--smtp-port", "MAILPEEK_SMTP_PORT", err)
 	}
-	if a.httpLn, err = net.Listen("tcp", a.cfg.HTTPAddr()); err != nil {
+	if a.httpLn, err = listen(a.cfg.Host, a.cfg.HTTPPort); err != nil {
 		_ = a.smtpLn.Close()
 		return listenError("HTTP", a.cfg.HTTPPort, "--http-port", "MAILPEEK_HTTP_PORT", err)
 	}

@@ -17,8 +17,12 @@ func TestLoadDefaults(t *testing.T) {
 	if cfg.SMTPPort != 1026 || cfg.HTTPPort != 8026 || cfg.MaxMessages != 100 || cfg.MaxMessageSize != 10<<20 {
 		t.Fatalf("unexpected defaults: %+v", cfg)
 	}
-	if cfg.SMTPAddr() != "0.0.0.0:1026" || cfg.HTTPAddr() != "0.0.0.0:8026" {
+	if cfg.SMTPAddr() != "localhost:1026" || cfg.HTTPAddr() != "localhost:8026" {
 		t.Fatalf("unexpected addrs: %s %s", cfg.SMTPAddr(), cfg.HTTPAddr())
+	}
+	ipv6 := Config{Host: "::1", SMTPPort: 1026}
+	if ipv6.SMTPAddr() != "[::1]:1026" {
+		t.Fatalf("IPv6 addr = %s", ipv6.SMTPAddr())
 	}
 }
 
@@ -145,5 +149,26 @@ func TestMaxStoreSize(t *testing.T) {
 	}
 	if _, err := Load([]string{"--max-store-size", "1MB"}, env(nil), io.Discard); err == nil {
 		t.Fatal("store smaller than one message must be rejected")
+	}
+}
+
+func TestSMTPTLSOptions(t *testing.T) {
+	cfg, err := Load([]string{"--smtp-tls"}, env(nil), io.Discard)
+	if err != nil || !cfg.SMTPTLS {
+		t.Fatalf("--smtp-tls: %+v %v", cfg, err)
+	}
+	cfg, err = Load(nil, env(map[string]string{"MAILPEEK_SMTP_TLS": "true"}), io.Discard)
+	if err != nil || !cfg.SMTPTLS {
+		t.Fatalf("MAILPEEK_SMTP_TLS: %+v %v", cfg, err)
+	}
+	cfg, err = Load([]string{"--smtp-tls-cert", "c.pem", "--smtp-tls-key", "k.pem"}, env(nil), io.Discard)
+	if err != nil || !cfg.SMTPTLS || cfg.SMTPTLSCert != "c.pem" || cfg.SMTPTLSKey != "k.pem" {
+		t.Fatalf("cert and key: %+v %v", cfg, err)
+	}
+	if _, err := Load([]string{"--smtp-tls-cert", "c.pem"}, env(nil), io.Discard); err == nil {
+		t.Fatal("a certificate without a key should be rejected")
+	}
+	if _, err := Load(nil, env(map[string]string{"MAILPEEK_SMTP_TLS": "maybe"}), io.Discard); err == nil {
+		t.Fatal("MAILPEEK_SMTP_TLS=maybe should be rejected")
 	}
 }

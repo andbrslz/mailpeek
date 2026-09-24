@@ -33,7 +33,9 @@ test("password reset", async ({ page, mail }) => {
 | `messages()`, `latest()`, `waitFor()`, `waitForEmails()`, `get()`, `delete()`, `clear()` | Same as `@mailpeek/client`. |
 | `client` | The underlying `Mailpeek` instance. |
 
-Inbox: `address`, `messages()`, `latest()`, `waitForEmail(options?)`, `waitForEmails(count, options?)`, `clear()`.
+Inbox: `address`, `messages()`, `latest()`, `waitForEmail(options?)`, `waitForEmails(count, options?)`, `failNext(options?)`, `clear()`.
+
+`inbox.failNext({ code: 451 })` makes the next delivery to that inbox fail, to test that the application retries or reports it; other tests are not affected.
 
 ## When a test fails
 

@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/mailpeek/mailpeek/internal/events"
+	"github.com/mailpeek/mailpeek/internal/failures"
 	"github.com/mailpeek/mailpeek/internal/store"
 )
 
@@ -28,6 +29,7 @@ type Info struct {
 	MaxMessageSize int64  `json:"maxMessageSize"`
 	MaxStoreSize   int64  `json:"maxStoreSize"`
 	SMTPAuth       bool   `json:"smtpAuth"`
+	SMTPTLS        bool   `json:"smtpTls"`
 	UIAuth         bool   `json:"uiAuth"`
 }
 
@@ -40,13 +42,14 @@ type Server struct {
 	sessions *sessions
 	mux      *http.ServeMux
 	patterns []string
+	failures *failures.Set
 }
 
 //go:embed openapi.json
 var openapi []byte
 
 func New(st *store.MemoryStore, broker *events.Broker, ui fs.FS, info Info, auth func(user, password string) bool) *Server {
-	s := &Server{store: st, broker: broker, ui: ui, info: info, auth: auth, sessions: newSessions(), mux: http.NewServeMux()}
+	s := &Server{store: st, broker: broker, ui: ui, info: info, auth: auth, sessions: newSessions(), mux: http.NewServeMux(), failures: &failures.Set{}}
 	s.info.UIAuth = auth != nil
 	s.routes()
 	return s
@@ -70,6 +73,10 @@ func (s *Server) routes() {
 	handle("DELETE /api/v1/messages/{id}", s.deleteMessage)
 	handle("GET /api/v1/messages/{id}/raw", s.rawMessage)
 	handle("GET /api/v1/messages/{id}/attachments/{attachmentId}", s.attachment)
+	handle("GET /api/v1/smtp/failures", s.listFailures)
+	handle("POST /api/v1/smtp/failures", s.addFailure)
+	handle("DELETE /api/v1/smtp/failures", s.clearFailures)
+	handle("DELETE /api/v1/smtp/failures/{id}", s.deleteFailure)
 	handle("GET /", s.serveUI)
 }
 
@@ -107,6 +114,7 @@ func parseFilter(q url.Values) (store.Filter, error) {
 		Address: q.Get("address"),
 		From:    q.Get("from"),
 		Subject: q.Get("subject"),
+		Body:    q.Get("body"),
 		Query:   q.Get("q"),
 	}
 	if v := q.Get("since"); v != "" {

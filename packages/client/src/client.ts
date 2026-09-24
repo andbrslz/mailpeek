@@ -2,12 +2,14 @@ import { explainMismatch } from "./diagnose.js";
 import { Email } from "./email.js";
 import { Inbox, randomId, type InboxOptions } from "./inbox.js";
 import type {
+  FailureOptions,
   MailpeekOptions,
   MessageData,
   MessageFilter,
   MessageSummary,
   RequestOptions,
   ServerInfo,
+  SmtpFailure,
   WaitOptions,
 } from "./types.js";
 
@@ -103,7 +105,7 @@ function envUrl(): string | undefined {
 
 function query(filter: MessageFilter, extra: Record<string, string> = {}): string {
   const params = new URLSearchParams();
-  for (const key of ["to", "address", "from", "subject", "q"] as const) {
+  for (const key of ["to", "address", "from", "subject", "body", "q"] as const) {
     const value = filter[key];
     if (value) params.set(key, value);
   }
@@ -247,6 +249,38 @@ export class Mailpeek {
     return body.deleted;
   }
 
+  /**
+   * Makes the next `count` matching SMTP deliveries fail with an error reply,
+   * to test how the application retries or reports it. Failed deliveries are
+   * not stored. Prefer `inbox.failNext()`, which only affects that inbox.
+   *
+   * ```ts
+   * await mailpeek.failNext({ address: "ana@example.com", code: 451 });
+   * ```
+   */
+  async failNext(failure: FailureOptions = {}, options: RequestOptions = {}): Promise<SmtpFailure> {
+    const res = await this.request("/smtp/failures", {
+      ...options,
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(failure),
+    });
+    return (await res.json()) as SmtpFailure;
+  }
+
+  /** Simulated failures that have not been used up yet, oldest first. */
+  async smtpFailures(options: RequestOptions = {}): Promise<SmtpFailure[]> {
+    const res = await this.request("/smtp/failures", options);
+    return ((await res.json()) as { failures: SmtpFailure[] }).failures;
+  }
+
+  /** Removes pending simulated failures (only those for `address` when given). Returns the count. */
+  async clearFailures(address?: string, options: RequestOptions = {}): Promise<number> {
+    const qs = address ? `?${new URLSearchParams({ address })}` : "";
+    const res = await this.request(`/smtp/failures${qs}`, { ...options, method: "DELETE" });
+    return ((await res.json()) as { deleted: number }).deleted;
+  }
+
   /** The raw MIME source. */
   async raw(id: string, options: RequestOptions = {}): Promise<string> {
     const res = await this.request(`/messages/${encodeURIComponent(id)}/raw`, options);
@@ -333,7 +367,8 @@ export class Mailpeek {
     const method = rest.method ?? "GET";
     let res: Response;
     try {
-      res = await this.fetchImpl(url, { ...rest, signal, headers: this.headers });
+      const headers = { ...this.headers, ...(rest.headers as Record<string, string> | undefined) };
+      res = await this.fetchImpl(url, { ...rest, signal, headers });
     } catch (err) {
       if (userSignal?.aborted) throw userSignal.reason ?? err;
       if (timer.aborted) {

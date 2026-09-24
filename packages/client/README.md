@@ -34,12 +34,15 @@ const link = email.findLink("Activate account"); // { text, href }
 | `attachment(messageId, attachmentId)` | `Uint8Array` |
 | `health()` | `boolean` |
 | `info()` | version, ports, limits and `store` usage (`messages`, `bytes`, `evicted`) |
+| `failNext({ code?, stage?, message?, address?, count? })` | `SmtpFailure`: the next matching deliveries get an SMTP error (default one `451` at the end of `DATA`) |
+| `smtpFailures()` | pending `SmtpFailure[]` |
+| `clearFailures(address?)` | number of rules removed |
 | `createInbox({ prefix?, domain? })` | `Inbox` with a unique address, matched exactly |
 | `inbox(address)` | `Inbox` for an existing address (exact match) |
 
 Every method also takes `{ signal }` (the last argument; inside the options for `waitFor`) to cancel it.
 
-Filters (combined with AND): `address` (exact recipient address: To, Cc or envelope), and the case-insensitive substrings `to`, `from`, `subject`, `q` (any of the three); plus `since` (`Date`, ISO string or Unix ms).
+Filters (combined with AND): `address` (exact recipient address: To, Cc or envelope), and the case-insensitive substrings `to`, `from`, `subject`, `body` (text or HTML body), `q` (subject, from, to or body); plus `since` (`Date`, ISO string or Unix ms).
 
 `Email` has plain fields (`id`, `from`, `to`, `cc`, `replyTo`, `subject`, `text`, `html`, `headers`, `attachments`, `links`, `envelope`, `date`, `createdAt`) and the helpers `findLink()`, `hasLink()`, `findCode()`, `getHeader()`, `getHeaders()` and `hasAttachment()`. `findLink()` and `findCode()` throw a descriptive error when nothing matches.
 
@@ -47,6 +50,8 @@ Filters (combined with AND): `address` (exact recipient address: To, Cc or envel
 const [welcome, verify] = await inbox.waitForEmails(2);
 const code = verify.findCode(); // "482913": the code after "code", "OTP", "PIN"…, else the first 6-digit number
 ```
+
+`inbox.failNext({ code: 451 })` makes the next delivery to that inbox fail with an SMTP error (`stage: "rcpt"` refuses the recipient instead of the message), to test that the application retries or reports it. Other inboxes are not affected, and `inbox.clear()` removes the inbox's pending rules.
 
 Options: `new Mailpeek({ baseUrl, auth, timeout, requestTimeout, inboxDomain, fetch })`. `timeout` (10 s) is how long `waitFor` waits for an email; `requestTimeout` (10 s) bounds each HTTP request, so a stuck connection can't hang a test.
 

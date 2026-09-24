@@ -140,4 +140,18 @@ export const rawUrl = (id: string, download = false) =>
 export const attachmentUrl = (messageId: string, attachmentId: string) =>
   `${base}/messages/${encodeURIComponent(messageId)}/attachments/${encodeURIComponent(attachmentId)}`;
 
+const previewableTypes = new Set([
+  "image/png",
+  "image/jpeg",
+  "image/gif",
+  "image/webp",
+  "image/avif",
+  "image/bmp",
+]);
+
+export const canPreview = (a: Attachment) => previewableTypes.has(a.contentType.toLowerCase());
+
+export const attachmentPreviewUrl = (messageId: string, attachmentId: string) =>
+  `${attachmentUrl(messageId, attachmentId)}?inline=1`;
+
 export const eventsUrl = `${base}/events`;

@@ -11,11 +11,13 @@ export type {
   Address,
   Attachment,
   Link,
+  FailureOptions,
   MailpeekOptions,
   MessageData,
   MessageFilter,
   MessageSummary,
   RequestOptions,
   ServerInfo,
+  SmtpFailure,
   WaitOptions,
 } from "./types.js";

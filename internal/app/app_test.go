@@ -3,20 +3,30 @@ package app
 import (
 	"bufio"
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
+	"encoding/pem"
+	"errors"
 	"fmt"
 	"io"
 	"log"
 	"net"
 	"net/http"
 	netsmtp "net/smtp"
+	"net/textproto"
+	"os"
+	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/mailpeek/mailpeek/internal/config"
 	"github.com/mailpeek/mailpeek/internal/mail"
+	"github.com/mailpeek/mailpeek/internal/smtp"
+	"github.com/mailpeek/mailpeek/internal/store"
 )
 
 func startApp(t *testing.T) (*App, string, string) {
@@ -159,6 +169,187 @@ func TestStartExplainsPortInUse(t *testing.T) {
 	for _, want := range []string{fmt.Sprintf("SMTP port %d is already in use", port), "--smtp-port", "MAILPEEK_SMTP_PORT"} {
 		if !strings.Contains(err.Error(), want) {
 			t.Errorf("error %q does not mention %q", err, want)
+		}
+	}
+}
+
+type lockedBuffer struct {
+	mu sync.Mutex
+	b  strings.Builder
+}
+
+func (l *lockedBuffer) Write(p []byte) (int, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.b.Write(p)
+}
+
+func (l *lockedBuffer) String() string {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.b.String()
+}
+
+func TestActivityLog(t *testing.T) {
+	creds, _ := config.ParseCredentials("app:secret")
+	cfg := config.Config{Host: "127.0.0.1", MaxMessages: 10, MaxMessageSize: 1 << 10, SMTPAuth: creds}
+	a := New(cfg, nil, "test", log.New(io.Discard, "", 0))
+	var activity lockedBuffer
+	a.SetActivityLog(log.New(&activity, "", 0))
+	if err := a.Start(); err != nil {
+		t.Fatal(err)
+	}
+	defer a.Shutdown(context.Background())
+	addr := a.SMTPAddr().String()
+	auth := netsmtp.PlainAuth("", "app", "secret", "127.0.0.1")
+
+	msg := "From: app@example.com\r\nTo: ana@example.com\r\nSubject: Welcome\r\n\r\nhi\r\n"
+	if err := netsmtp.SendMail(addr, auth, "app@example.com", []string{"ana@example.com"}, []byte(msg)); err != nil {
+		t.Fatal(err)
+	}
+	big := "Subject: Big\r\n\r\n" + strings.Repeat("x", 2<<10) + "\r\n"
+	if err := netsmtp.SendMail(addr, auth, "app@example.com", []string{"bia@example.com"}, []byte(big)); err == nil {
+		t.Fatal("expected the big message to be rejected")
+	}
+	if err := netsmtp.SendMail(addr, nil, "app@example.com", []string{"ana@example.com"}, []byte(msg)); err == nil {
+		t.Fatal("expected a login to be required")
+	}
+	wrong := netsmtp.PlainAuth("", "app", "nope", "127.0.0.1")
+	_ = netsmtp.SendMail(addr, wrong, "app@example.com", []string{"ana@example.com"}, []byte(msg))
+
+	id := a.Store().List(store.Filter{})[0].ID
+	for _, want := range []string{
+		"received " + id + ` from app@example.com to ana@example.com "Welcome" (`,
+		"rejected message from 127.0.0.1:",
+		"to bia@example.com: over --max-message-size (1KB)",
+		"SMTP login required",
+		`SMTP login failed for user "app"`,
+	} {
+		if !strings.Contains(activity.String(), want) {
+			t.Errorf("activity log misses %q:\n%s", want, activity.String())
+		}
+	}
+}
+
+func sendOverTLS(t *testing.T, addr string) {
+	t.Helper()
+	c, err := netsmtp.Dial(addr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
+	if err := c.StartTLS(&tls.Config{InsecureSkipVerify: true}); err != nil {
+		t.Fatal(err)
+	}
+	if err := c.Mail("app@example.com"); err != nil {
+		t.Fatal(err)
+	}
+	if err := c.Rcpt("ana@example.com"); err != nil {
+		t.Fatal(err)
+	}
+	w, err := c.Data()
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, _ = io.WriteString(w, "Subject: Secure\r\n\r\nhi\r\n")
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+	_ = c.Quit()
+}
+
+func TestSMTPTLSSelfSignedAndFromFiles(t *testing.T) {
+	generated, err := smtp.SelfSignedTLS("127.0.0.1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	dir := t.TempDir()
+	certFile, keyFile := filepath.Join(dir, "cert.pem"), filepath.Join(dir, "key.pem")
+	cert := generated.Certificates[0]
+	keyDER, err := x509.MarshalPKCS8PrivateKey(cert.PrivateKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = os.WriteFile(certFile, pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: cert.Certificate[0]}), 0o600)
+	_ = os.WriteFile(keyFile, pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: keyDER}), 0o600)
+
+	for name, cfg := range map[string]config.Config{
+		"self-signed": {SMTPTLS: true},
+		"from files":  {SMTPTLS: true, SMTPTLSCert: certFile, SMTPTLSKey: keyFile},
+	} {
+		t.Run(name, func(t *testing.T) {
+			cfg.Host, cfg.MaxMessages, cfg.MaxMessageSize = "127.0.0.1", 10, 1<<20
+			a := New(cfg, nil, "test", log.New(io.Discard, "", 0))
+			if err := a.Start(); err != nil {
+				t.Fatal(err)
+			}
+			defer a.Shutdown(context.Background())
+			sendOverTLS(t, a.SMTPAddr().String())
+			if a.Store().Len() != 1 {
+				t.Fatalf("stored %d messages", a.Store().Len())
+			}
+		})
+	}
+
+	bad := config.Config{Host: "127.0.0.1", MaxMessages: 10, MaxMessageSize: 1 << 20, SMTPTLS: true,
+		SMTPTLSCert: filepath.Join(dir, "missing.pem"), SMTPTLSKey: keyFile}
+	if err := New(bad, nil, "test", log.New(io.Discard, "", 0)).Start(); err == nil || !strings.Contains(err.Error(), "smtp-tls-cert") {
+		t.Fatalf("missing certificate: %v", err)
+	}
+}
+
+func TestSimulatedSMTPFailures(t *testing.T) {
+	a, smtpAddr, base := startApp(t)
+	defer a.Shutdown(context.Background())
+	var activity lockedBuffer
+	a.SetActivityLog(log.New(&activity, "", 0))
+
+	addRule := func(body string) {
+		t.Helper()
+		resp, err := http.Post(base+"/api/v1/smtp/failures", "application/json", strings.NewReader(body))
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+		if resp.StatusCode != http.StatusCreated {
+			t.Fatalf("add rule: %d", resp.StatusCode)
+		}
+	}
+	deliver := func(to string) error {
+		msg := "From: app@example.com\r\nTo: " + to + "\r\nSubject: Retry me\r\n\r\nhi\r\n"
+		return netsmtp.SendMail(smtpAddr, nil, "app@example.com", []string{to}, []byte(msg))
+	}
+	code := func(err error) int {
+		var tp *textproto.Error
+		if errors.As(err, &tp) {
+			return tp.Code
+		}
+		return 0
+	}
+
+	addRule(`{"stage":"data","code":451,"address":"ana@example.com"}`)
+	if err := deliver("bia@example.com"); err != nil {
+		t.Fatalf("another address must not be affected: %v", err)
+	}
+	if err := deliver("ana@example.com"); code(err) != 451 {
+		t.Fatalf("first delivery to ana: %v", err)
+	}
+	if err := deliver("ana@example.com"); err != nil {
+		t.Fatalf("retry after the rule was used up: %v", err)
+	}
+
+	addRule(`{"stage":"rcpt","code":550,"message":"5.1.1 No such user"}`)
+	err := deliver("carl@example.com")
+	if code(err) != 550 || !strings.Contains(err.Error(), "No such user") {
+		t.Fatalf("rcpt failure: %v", err)
+	}
+
+	if n := a.Store().Len(); n != 2 {
+		t.Fatalf("stored %d messages, want 2 (failed deliveries are not stored)", n)
+	}
+	for _, want := range []string{"simulated failure 451 at DATA for ana@example.com", "simulated failure 550 at RCPT for carl@example.com"} {
+		if !strings.Contains(activity.String(), want) {
+			t.Errorf("activity log misses %q:\n%s", want, activity.String())
 		}
 	}
 }

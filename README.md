@@ -68,7 +68,7 @@ SMTP_PORT=1026
 
 Open **http://localhost:8026**. New emails appear instantly.
 
-No TLS and no credentials are needed. If your mailer insists on authenticating, any username and password is accepted (`AUTH PLAIN`/`LOGIN`), unless you [set credentials](#credentials-optional). Mailpeek never delivers or relays mail anywhere.
+No TLS and no credentials are needed. If your mailer insists on authenticating, any username and password is accepted (`AUTH PLAIN`/`LOGIN`), unless you [set credentials](#credentials-optional); if it insists on TLS, start Mailpeek with [`--smtp-tls`](#tls-optional). Mailpeek never delivers or relays mail anywhere.
 
 ### Other ports
 
@@ -202,7 +202,7 @@ Nothing is created on the server. An inbox is a unique address matched **exactly
 | `mail.createInbox()` | `test-<random>@mailpeek.local`       | one test (recommended)                 |
 | `mail.workerInbox()` | `worker-<n>-<random>@mailpeek.local` | one Playwright worker                  |
 
-Inbox methods: `address`, `messages()`, `latest()`, `waitForEmail(options?)`, `waitForEmails(count, options?)`, `clear()`. `mail.client.inbox("ana@example.com")` gives the same view for an address you already have.
+Inbox methods: `address`, `messages()`, `latest()`, `waitForEmail(options?)`, `waitForEmails(count, options?)`, `failNext(options?)`, `clear()`. `mail.client.inbox("ana@example.com")` gives the same view for an address you already have.
 
 `createInbox({ prefix, domain })` changes the address, for example when your app rejects `.local` domains:
 
@@ -221,6 +221,24 @@ await page.getByLabel("Code").fill(code);
 ```
 
 `findCode()` prefers a code right after words like "code", "código", "OTP", "PIN" or "verification", then falls back to the first 6-digit number; `findCode({ pattern: /token=(\w+)/ })` handles other formats.
+
+### Delivery failures and retries
+
+`inbox.failNext()` makes the next delivery to that inbox fail, so a test can check that the application retries, queues or reports the error. Other inboxes, and parallel tests, are not affected:
+
+```ts
+test("the welcome email is retried after a temporary failure", async ({ page, mail }) => {
+  const inbox = mail.createInbox();
+  await inbox.failNext({ code: 451 }); // the next delivery gets "451 4.3.0 Temporary failure"
+
+  await signUp(page, inbox.address);
+
+  const email = await inbox.waitForEmail({ subject: "Welcome" }); // the retry arrived
+  expect(email.subject).toBe("Welcome");
+});
+```
+
+Options: `code` (400 to 599, default `451`), `stage` (`"data"`, the default, refuses the message after it was sent; `"rcpt"` refuses the recipient, like an unknown user with `550`), `message` and `count` (default 1). Failed deliveries are not stored. `mail.client.failNext({ address?, ... })` does the same for any recipient, `mail.client.smtpFailures()` lists pending rules and `mail.client.clearFailures()` removes them; `inbox.clear()` also removes the inbox's rules.
 
 ### When a test fails
 
@@ -324,7 +342,8 @@ Filters are combined with AND. Text filters are **case-insensitive substrings**,
 | `to`      | To, Cc or envelope recipient, as a substring of the address or name |
 | `from`    | From header or envelope sender                                     |
 | `subject` | Subject                                                            |
-| `q`       | subject **or** from **or** to                                      |
+| `body`    | text or HTML body                                                  |
+| `q`       | subject **or** from **or** to **or** body                          |
 | `since`   | received at or after (`Date`, ISO string, or Unix ms)              |
 
 `waitFor()` resolves with the **newest matching message that already exists**, or waits for one to arrive. Use `since` when a test triggers the same email twice:
@@ -418,13 +437,17 @@ Zero config by default. CLI flags take precedence over environment variables.
 | `--max-messages`     | `MAILPEEK_MAX_MESSAGES`     | `100` (oldest removed first) |
 | `--max-message-size` | `MAILPEEK_MAX_MESSAGE_SIZE` | `10MB`    |
 | `--max-store-size`   | `MAILPEEK_MAX_STORE_SIZE`   | `256MB` (memory for all messages; oldest removed first) |
-| `--host`             | `MAILPEEK_HOST`             | `0.0.0.0` |
+| `--host`             | `MAILPEEK_HOST`             | `localhost` (this machine only; the Docker image uses `0.0.0.0`) |
 | `--smtp-auth`        | `MAILPEEK_SMTP_AUTH`        | off (any login accepted) |
 | `--ui-auth`          | `MAILPEEK_UI_AUTH`          | off (open)                |
+| `--smtp-tls`         | `MAILPEEK_SMTP_TLS`         | off; `true` offers STARTTLS with a self-signed certificate |
+| `--smtp-tls-cert`, `--smtp-tls-key` | `MAILPEEK_SMTP_TLS_CERT`, `MAILPEEK_SMTP_TLS_KEY` | off; PEM files for STARTTLS instead of the self-signed certificate |
 
 ```bash
 mailpeek --smtp-port 1026 --http-port 8026 --max-messages 100
 ```
+
+The binary only accepts connections from this machine (`127.0.0.1` and `::1`), so captured emails stay private on shared networks. Use `--host 0.0.0.0` when other machines, or an application in a container, must reach a Mailpeek running outside Docker. The Docker image already listens on all interfaces, which the container needs.
 
 In Docker, the published port and the container port should be the same (`-e MAILPEEK_SMTP_PORT=1027 -p 1027:1027`); see [Other ports](#other-ports).
 
@@ -455,6 +478,20 @@ Any page opened without a session goes to `/login` and returns there after signi
 
 Both logins travel in plain text (SMTP without TLS, the sign-in form and HTTP Basic over `http://`). They keep other people on a shared network or CI host out of your inbox; they are not a substitute for not exposing Mailpeek to the internet. The banner shows `(login required)` next to each protected address, and the Web UI shows when SMTP needs a login.
 
+### TLS (optional)
+
+Some mailers refuse to send without TLS. `--smtp-tls` (or `MAILPEEK_SMTP_TLS=true`) makes SMTP offer `STARTTLS` with a certificate generated at startup for `localhost`, `127.0.0.1`, `::1`, `mailpeek` and the machine name. It is self-signed, so tell the application not to verify it (Nodemailer: `tls: { rejectUnauthorized: false }`), or pass a certificate it trusts with `--smtp-tls-cert cert.pem --smtp-tls-key key.pem`. Plain connections keep working: clients choose whether to upgrade.
+
+### Activity log
+
+Every received email is logged on standard output, and so is every rejection, so CI logs answer "did the email arrive?":
+
+```text
+2026/09/24 10:15:02 received 3f9c1a2b4d5e6f70 from app@acme.test to ana@example.com "Welcome" (3.2 KB)
+2026/09/24 10:15:09 rejected message from 172.18.0.3:51234 to bia@example.com: over --max-message-size (10MB)
+2026/09/24 10:15:11 SMTP login failed for user "app" from 172.18.0.3:51240: wrong username or password
+```
+
 Other commands:
 
 - `mailpeek send --to ana@example.com` sends a test email to a running Mailpeek and prints its id, to check that everything is wired up. Flags: `--subject`, `--text`, `--html`, `--from`, `--host`, `--port` (default `MAILPEEK_SMTP_PORT` or 1026) and `--auth user:password` (default `MAILPEEK_SMTP_AUTH`). In Docker: `docker exec <container> /mailpeek send --to ana@example.com`.
@@ -471,8 +508,8 @@ Messages live in memory only and are gone when Mailpeek stops.
 - New emails are marked until opened; the unread count appears as a badge on the browser tab icon and in the title, e.g. `(2) Mailpeek`
 - A short synthesized chime plays when an email arrives (after your first click on the page, as browsers require). Turn it off with the bell button in the header; the choice is remembered in the browser
 - Reading a message is never interrupted: new arrivals do not change the selection
-- Search across subject, from and to (uses the API filters)
-- Tabs: **HTML** (sandboxed), **Text**, **Headers**, **Raw** (MIME syntax highlighting), **Attachments**, **Links** (copy or open each URL)
+- Search across subject, from, to and the body (uses the API filters)
+- Tabs: **HTML** (sandboxed), **Text**, **Headers**, **Raw** (MIME syntax highlighting), **Attachments** (image thumbnails, open or download), **Links** (copy or open each URL)
 - HTML preview at desktop, tablet (768 px) or mobile (375 px) width, and in **full screen** (`Esc` to close)
 - Collapse the email details (From, To, date) to give the preview more room; the choice is remembered
 - Inline `cid:` images are shown in the HTML preview
@@ -505,7 +542,7 @@ Base path: `/api/v1`. All responses are JSON unless noted.
 
 | Method   | Path                                   | Description |
 | -------- | -------------------------------------- | ----------- |
-| `GET`    | `/messages`                            | `{ messages: Summary[], count, nextCursor? }`, newest first. Filters: `address` (exact), `to`, `from`, `subject`, `q`, `since`. Optional paging: `limit`, then `cursor=<nextCursor>` for the next page (absent on the last one). Without `limit`, every match is returned. |
+| `GET`    | `/messages`                            | `{ messages: Summary[], count, nextCursor? }`, newest first. Filters: `address` (exact), `to`, `from`, `subject`, `body`, `q`, `since`. Optional paging: `limit`, then `cursor=<nextCursor>` for the next page (absent on the last one). Without `limit`, every match is returned. |
 | `GET`    | `/messages/count`                      | `{ count }` of messages matching the same filters. |
 | `DELETE` | `/messages`                            | Delete matching messages (all when no filter). `{ deleted }` |
 | `GET`    | `/messages/latest`                     | Newest matching message, or `404`. |
@@ -517,6 +554,10 @@ Base path: `/api/v1`. All responses are JSON unless noted.
 | `GET`    | `/events`                              | Server-sent events: `message.created`, `message.deleted` (`data: {"id":"…"}`), `messages.cleared`. |
 | `GET`    | `/health`                              | `{"status":"ok"}` |
 | `GET`    | `/openapi.json`                        | OpenAPI 3.1 description of this API. |
+| `POST`   | `/smtp/failures`                       | Make upcoming deliveries fail: JSON `{ stage?: "rcpt" \| "data", code?: 451, message?, address?, count?: 1 }`. `201` + rule. |
+| `GET`    | `/smtp/failures`                       | Pending simulated failures. |
+| `DELETE` | `/smtp/failures`                       | Remove them (only one address's with `?address=`). `{ deleted }` |
+| `DELETE` | `/smtp/failures/{id}`                  | Remove one rule. `204`, or `404`. |
 | `GET`    | `/info`                                | Version, ports, limits and `store` usage: `messages`, `bytes`, `evicted`. |
 
 ```bash
@@ -531,7 +572,8 @@ Mailpeek is a development tool: do not expose it to the internet. Authentication
 
 - **No relay.** Every recipient is accepted, and nothing is ever delivered or forwarded.
 - **HTML never runs.** Previews render in an `<iframe sandbox>` without `allow-scripts` or `allow-same-origin`, under a Content-Security-Policy that only allows Mailpeek's own scripts. Links found in emails are never fetched.
-- **Safe attachments.** Downloads always use `Content-Disposition: attachment` with a sanitized filename, `X-Content-Type-Options: nosniff` and `Content-Security-Policy: sandbox`. Attachments are looked up by ID in memory, never on disk, so there is no path traversal.
+- **Local by default.** The binary listens on `127.0.0.1` and `::1` only, so other machines on the network cannot read captured emails unless you pass `--host 0.0.0.0` (the Docker image does, inside the container).
+- **Safe attachments.** Downloads use `Content-Disposition: attachment` with a sanitized filename, `X-Content-Type-Options: nosniff` and `Content-Security-Policy: sandbox`. Only PNG, JPEG, GIF, WebP, AVIF and BMP images can be opened in the browser (never SVG or HTML). Attachments are looked up by ID in memory, never on disk, so there is no path traversal.
 - **Limits.** Maximum message size (`SIZE` is advertised and enforced), a total memory budget for stored messages (`--max-store-size`), at most 100 simultaneous SMTP connections (more get `421`), bounded concurrent MIME parsing, 100 recipients per message, bounded SMTP line length, idle/data/write timeouts on SMTP, header/read/write/idle timeouts and a 64 KB header limit on HTTP, and disconnection after repeated protocol errors.
 - **Graceful shutdown** on `SIGINT`/`SIGTERM`: SMTP stops accepting and finishes in-flight messages, SSE streams and pending wait requests end, and HTTP drains.
 

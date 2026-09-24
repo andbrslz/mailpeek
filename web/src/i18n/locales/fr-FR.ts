@@ -88,6 +88,8 @@ export const frFR: Messages = {
   "copy.copied": "Copié",
   "attachments.none": "Aucune pièce jointe.",
   "attachments.download": "Télécharger",
+  "attachments.open": "Ouvrir",
+  "attachments.preview": "Aperçu de {name}",
   "attachments.inline": "intégrée",
   "links.none": "Aucun lien trouvé.",
   "links.noText": "(sans texte)",

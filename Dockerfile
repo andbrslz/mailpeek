@@ -30,6 +30,7 @@ RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH \
 # 3. Runtime: just the binary
 FROM scratch
 COPY --from=build /mailpeek /mailpeek
+ENV MAILPEEK_HOST=0.0.0.0
 USER 65534:65534
 EXPOSE 1026 8026
 HEALTHCHECK --interval=10s --timeout=3s --start-period=2s --retries=3 CMD ["/mailpeek", "healthcheck"]

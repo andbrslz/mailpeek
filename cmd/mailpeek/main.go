@@ -52,6 +52,7 @@ func run(ctx context.Context, args []string, getenv func(string) string, out io.
 	logger := log.New(os.Stderr, "mailpeek: ", log.LstdFlags)
 	ui := web.FS()
 	a := app.New(cfg, ui, version, logger)
+	a.SetActivityLog(log.New(out, "", log.LstdFlags))
 	if err := a.Start(); err != nil {
 		return err
 	}
@@ -68,7 +69,7 @@ func run(ctx context.Context, args []string, getenv func(string) string, out io.
 
 func printBanner(out io.Writer, cfg config.Config, a *app.App, hasUI bool, elapsed time.Duration) {
 	display := cfg.Host
-	if display == "" || display == "0.0.0.0" || display == "::" {
+	if display == "" || display == "0.0.0.0" || display == "::" || display == "localhost" {
 		display = "localhost"
 	}
 	login := func(c config.Credentials) string {
@@ -77,13 +78,20 @@ func printBanner(out io.Writer, cfg config.Config, a *app.App, hasUI bool, elaps
 		}
 		return ""
 	}
+	smtpNote := login(cfg.SMTPAuth)
+	switch {
+	case cfg.SMTPTLSCert != "":
+		smtpNote += "  (STARTTLS)"
+	case cfg.SMTPTLS:
+		smtpNote += "  (STARTTLS, self-signed certificate: clients must skip verification)"
+	}
 	web := login(cfg.UIAuth)
 	if !hasUI {
 		web += "  (API only: this binary was built without the Web UI, e.g. by go install;" +
 			" use a release binary, the Docker image or make build)"
 	}
 	fmt.Fprintf(out, "Mailpeek\n\nSMTP  smtp://%s%s\nWeb   http://%s%s\n\nReady in %dms\n",
-		net.JoinHostPort(display, port(a.SMTPAddr())), login(cfg.SMTPAuth),
+		net.JoinHostPort(display, port(a.SMTPAddr())), smtpNote,
 		net.JoinHostPort(display, port(a.HTTPAddr())), web,
 		elapsed.Milliseconds())
 }

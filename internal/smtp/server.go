@@ -3,6 +3,7 @@ package smtp
 import (
 	"bufio"
 	"context"
+	"crypto/tls"
 	"errors"
 	"log"
 	"net"
@@ -15,6 +16,7 @@ type Envelope struct {
 	From       string
 	To         []string
 	RemoteAddr string
+	TLS        bool
 }
 
 type Handler func(env Envelope, data []byte) (id string, err error)
@@ -31,7 +33,10 @@ type Server struct {
 	WriteTimeout   time.Duration
 	DataTimeout    time.Duration
 	Auth           func(user, password string) bool
+	TLSConfig      *tls.Config
+	Reject         func(stage string, to []string) (code int, message string, ok bool)
 	ErrorLog       *log.Logger
+	ActivityLog    *log.Logger
 
 	mu       sync.Mutex
 	listener net.Listener
@@ -145,6 +150,12 @@ func (s *Server) untrack(sess *session) {
 func (s *Server) logf(format string, args ...any) {
 	if s.ErrorLog != nil {
 		s.ErrorLog.Printf(format, args...)
+	}
+}
+
+func (s *Server) note(format string, args ...any) {
+	if s.ActivityLog != nil {
+		s.ActivityLog.Printf(format, args...)
 	}
 }
 

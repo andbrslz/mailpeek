@@ -7,6 +7,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"net"
 	"strconv"
 	"strings"
 )
@@ -28,6 +29,9 @@ type Config struct {
 	MaxStoreSize   int64
 	SMTPAuth       Credentials
 	UIAuth         Credentials
+	SMTPTLS        bool
+	SMTPTLSCert    string
+	SMTPTLSKey     string
 }
 
 type Credentials struct {
@@ -52,15 +56,15 @@ func ParseCredentials(s string) (Credentials, error) {
 	return Credentials{User: user, Password: password}, nil
 }
 
-func (c Config) SMTPAddr() string { return fmt.Sprintf("%s:%d", c.Host, c.SMTPPort) }
+func (c Config) SMTPAddr() string { return net.JoinHostPort(c.Host, strconv.Itoa(c.SMTPPort)) }
 
-func (c Config) HTTPAddr() string { return fmt.Sprintf("%s:%d", c.Host, c.HTTPPort) }
+func (c Config) HTTPAddr() string { return net.JoinHostPort(c.Host, strconv.Itoa(c.HTTPPort)) }
 
 var ErrHelp = flag.ErrHelp
 
 func Load(args []string, getenv func(string) string, output io.Writer) (Config, error) {
 	cfg := Config{
-		Host:           "0.0.0.0",
+		Host:           "localhost",
 		SMTPPort:       DefaultSMTPPort,
 		HTTPPort:       DefaultHTTPPort,
 		MaxMessages:    DefaultMaxMessages,
@@ -73,7 +77,7 @@ func Load(args []string, getenv func(string) string, output io.Writer) (Config, 
 
 	fs := flag.NewFlagSet("mailpeek", flag.ContinueOnError)
 	fs.SetOutput(output)
-	fs.StringVar(&cfg.Host, "host", cfg.Host, "interface to bind (env MAILPEEK_HOST)")
+	fs.StringVar(&cfg.Host, "host", cfg.Host, "interface to bind: localhost is this machine only; 0.0.0.0 accepts other machines and containers (env MAILPEEK_HOST)")
 	fs.IntVar(&cfg.SMTPPort, "smtp-port", cfg.SMTPPort, "SMTP port (env MAILPEEK_SMTP_PORT)")
 	fs.IntVar(&cfg.HTTPPort, "http-port", cfg.HTTPPort, "HTTP port for Web UI and API (env MAILPEEK_HTTP_PORT)")
 	fs.IntVar(&cfg.MaxMessages, "max-messages", cfg.MaxMessages, "messages kept in memory; oldest are removed (env MAILPEEK_MAX_MESSAGES)")
@@ -82,11 +86,17 @@ func Load(args []string, getenv func(string) string, output io.Writer) (Config, 
 	fs.Var(sizeFlag{&cfg.MaxStoreSize}, "max-store-size", "memory for all stored messages; oldest are removed first (env MAILPEEK_MAX_STORE_SIZE)")
 	fs.Var(credFlag{&cfg.SMTPAuth}, "smtp-auth", "require SMTP login, as user:password (env MAILPEEK_SMTP_AUTH)")
 	fs.Var(credFlag{&cfg.UIAuth}, "ui-auth", "protect the Web UI and API with HTTP Basic auth, as user:password (env MAILPEEK_UI_AUTH)")
+	fs.BoolVar(&cfg.SMTPTLS, "smtp-tls", cfg.SMTPTLS, "offer STARTTLS on SMTP, with a self-signed certificate unless --smtp-tls-cert is given (env MAILPEEK_SMTP_TLS)")
+	fs.StringVar(&cfg.SMTPTLSCert, "smtp-tls-cert", cfg.SMTPTLSCert, "PEM certificate for STARTTLS; implies --smtp-tls (env MAILPEEK_SMTP_TLS_CERT)")
+	fs.StringVar(&cfg.SMTPTLSKey, "smtp-tls-key", cfg.SMTPTLSKey, "PEM private key for --smtp-tls-cert (env MAILPEEK_SMTP_TLS_KEY)")
 	if err := fs.Parse(args); err != nil {
 		return Config{}, err
 	}
 	if fs.NArg() > 0 {
 		return Config{}, fmt.Errorf("unexpected argument %q", fs.Arg(0))
+	}
+	if cfg.SMTPTLSCert != "" {
+		cfg.SMTPTLS = true
 	}
 	return cfg, cfg.validate()
 }
@@ -95,6 +105,15 @@ func applyEnv(cfg *Config, getenv func(string) string) error {
 	if v := getenv("MAILPEEK_HOST"); v != "" {
 		cfg.Host = v
 	}
+	if v := getenv("MAILPEEK_SMTP_TLS"); v != "" {
+		on, err := strconv.ParseBool(strings.TrimSpace(v))
+		if err != nil {
+			return fmt.Errorf("MAILPEEK_SMTP_TLS: use true or false, got %q", v)
+		}
+		cfg.SMTPTLS = on
+	}
+	cfg.SMTPTLSCert = orEnv(getenv("MAILPEEK_SMTP_TLS_CERT"), cfg.SMTPTLSCert)
+	cfg.SMTPTLSKey = orEnv(getenv("MAILPEEK_SMTP_TLS_KEY"), cfg.SMTPTLSKey)
 	ints := []struct {
 		key string
 		dst *int
@@ -162,7 +181,17 @@ func (c Config) validate() error {
 	if c.MaxStoreSize < c.MaxMessageSize {
 		errs = append(errs, errors.New("max-store-size must be at least max-message-size"))
 	}
+	if (c.SMTPTLSCert == "") != (c.SMTPTLSKey == "") {
+		errs = append(errs, errors.New("smtp-tls-cert and smtp-tls-key must be given together"))
+	}
 	return errors.Join(errs...)
+}
+
+func orEnv(v, fallback string) string {
+	if v != "" {
+		return v
+	}
+	return fallback
 }
 
 func ParseSize(s string) (int64, error) {

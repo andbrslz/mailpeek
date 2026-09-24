@@ -1,5 +1,11 @@
-import { Download, File, FileArchive, FileImage, FileText } from "lucide-react";
-import { attachmentUrl, type Attachment, type Message } from "../../api";
+import { Download, ExternalLink, File, FileArchive, FileImage, FileText } from "lucide-react";
+import {
+  attachmentPreviewUrl,
+  attachmentUrl,
+  canPreview,
+  type Attachment,
+  type Message,
+} from "../../api";
 import { useI18n } from "../../i18n/context";
 import { fileTypeLabel, formatBytes } from "../../lib/format";
 import { Empty } from "./Empty";
@@ -13,6 +19,9 @@ function AttachmentIcon({ a }: { a: Attachment }) {
   return <File className={cls} />;
 }
 
+const buttonClass =
+  "inline-flex h-8 items-center gap-1.5 rounded-md border border-zinc-200 px-2.5 text-sm font-medium hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-900";
+
 export function AttachmentsPanel({ message }: { message: Message }) {
   const { t, locale } = useI18n();
   if (message.attachments.length === 0) return <Empty>{t("attachments.none")}</Empty>;
@@ -20,9 +29,25 @@ export function AttachmentsPanel({ message }: { message: Message }) {
     <ul className="divide-y divide-zinc-100 dark:divide-zinc-900">
       {message.attachments.map((a) => (
         <li key={a.id} className="flex items-center gap-3 px-5 py-3">
-          <div className="flex size-9 shrink-0 items-center justify-center rounded-md border border-zinc-200 dark:border-zinc-800">
-            <AttachmentIcon a={a} />
-          </div>
+          {canPreview(a) ? (
+            <a
+              href={attachmentPreviewUrl(message.id, a.id)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="size-12 shrink-0 overflow-hidden rounded-md border border-zinc-200 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900"
+            >
+              <img
+                src={attachmentPreviewUrl(message.id, a.id)}
+                alt={t("attachments.preview", { name: a.filename })}
+                loading="lazy"
+                className="size-full object-cover"
+              />
+            </a>
+          ) : (
+            <div className="flex size-12 shrink-0 items-center justify-center rounded-md border border-zinc-200 dark:border-zinc-800">
+              <AttachmentIcon a={a} />
+            </div>
+          )}
           <div className="min-w-0 flex-1">
             <div className="truncate text-sm font-medium" title={a.filename}>
               {a.filename}
@@ -39,11 +64,17 @@ export function AttachmentsPanel({ message }: { message: Message }) {
               )}
             </div>
           </div>
-          <a
-            href={attachmentUrl(message.id, a.id)}
-            download={a.filename}
-            className="inline-flex h-8 items-center gap-1.5 rounded-md border border-zinc-200 px-2.5 text-sm font-medium hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-900"
-          >
+          {canPreview(a) && (
+            <a
+              href={attachmentPreviewUrl(message.id, a.id)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={buttonClass}
+            >
+              <ExternalLink className="size-3.5" /> {t("attachments.open")}
+            </a>
+          )}
+          <a href={attachmentUrl(message.id, a.id)} download={a.filename} className={buttonClass}>
             <Download className="size-3.5" /> {t("attachments.download")}
           </a>
         </li>

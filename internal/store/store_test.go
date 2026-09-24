@@ -119,6 +119,8 @@ func TestFilter(t *testing.T) {
 		To:        []mail.Address{{Address: "john@example.com"}},
 		Cc:        []mail.Address{{Name: "Boss", Address: "boss@example.com"}},
 		Subject:   "Welcome to Acme",
+		Text:      "Your code is 481516",
+		HTML:      `<a href="https://acme.com/verify/XYZ">Verify</a>`,
 		Envelope:  mail.Envelope{From: "bounce@acme.com", To: []string{"hidden-bcc@example.com"}},
 		CreatedAt: time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC),
 	}
@@ -141,6 +143,11 @@ func TestFilter(t *testing.T) {
 		{Filter{Query: "acme"}, true},
 		{Filter{Query: "john"}, true},
 		{Filter{Query: "invoice"}, false},
+		{Filter{Query: "481516"}, true},
+		{Filter{Body: "481516"}, true},
+		{Filter{Body: "/VERIFY/xyz"}, true},
+		{Filter{Body: "welcome"}, false},
+		{Filter{Body: "481516", Subject: "invoice"}, false},
 		{Filter{Since: m.CreatedAt}, true},
 		{Filter{Since: m.CreatedAt.Add(time.Millisecond)}, false},
 	}

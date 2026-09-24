@@ -5,7 +5,9 @@ const includes = (value: string | undefined, needle: string) =>
 
 /**
  * Why a message does not match a filter, mirroring the server's rules.
- * An empty list means it matches.
+ * An empty list means it matches. Summaries carry no body, so this is meant
+ * for messages the server already did not match: when every other filter
+ * passes, a `body` filter is reported as the reason.
  */
 export function explainMismatch(m: MessageSummary, f: MessageFilter): string[] {
   const reasons: string[] = [];
@@ -43,11 +45,14 @@ export function explainMismatch(m: MessageSummary, f: MessageFilter): string[] {
       includes(m.from.address, q) ||
       includes(m.from.name, q) ||
       recipients.some((a) => includes(a.address, q) || includes(a.name, q));
-    if (!hit) reasons.push(`does not match ${JSON.stringify(q)}`);
+    if (!hit) reasons.push(`does not match ${JSON.stringify(q)} (subject, from, to or body)`);
   }
   if (f.since !== undefined) {
     const since = f.since instanceof Date ? f.since.getTime() : new Date(f.since).getTime();
     if (Date.parse(m.createdAt) < since) reasons.push("received before `since`");
+  }
+  if (f.body && reasons.length === 0) {
+    reasons.push(`body does not contain ${JSON.stringify(f.body)}`);
   }
   return reasons;
 }

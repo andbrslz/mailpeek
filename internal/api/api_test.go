@@ -734,3 +734,104 @@ func TestOpenAPIDescribesEveryRoute(t *testing.T) {
 		}
 	}
 }
+
+func TestAttachmentInlineOnlyForSafeImages(t *testing.T) {
+	e := newEnv(t, nil)
+	m := e.add(`From: a@x
+To: b@x
+Subject: Pictures
+Content-Type: multipart/mixed; boundary=b
+
+--b
+Content-Type: text/plain
+
+see attached
+--b
+Content-Type: image/png
+Content-Disposition: attachment; filename="logo.png"
+Content-Transfer-Encoding: base64
+
+iVBORw0KGgo=
+--b
+Content-Type: image/svg+xml
+Content-Disposition: attachment; filename="icon.svg"
+
+<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>
+--b--
+`)
+	cases := []struct {
+		path, want string
+	}{
+		{"/attachments/1?inline=1", "inline; filename=logo.png"},
+		{"/attachments/1", "attachment; filename=logo.png"},
+		{"/attachments/2?inline=1", "attachment; filename=icon.svg"},
+	}
+	for _, c := range cases {
+		resp := e.do("GET", "/api/v1/messages/"+m.ID+c.path)
+		if cd := resp.Header.Get("Content-Disposition"); cd != c.want {
+			t.Errorf("%s: disposition %q, want %q", c.path, cd, c.want)
+		}
+		if csp := resp.Header.Get("Content-Security-Policy"); csp != "sandbox" {
+			t.Errorf("%s: CSP %q", c.path, csp)
+		}
+	}
+	resp := e.do("GET", "/api/v1/messages/"+m.ID+"/attachments/1?inline=1")
+	if ct := resp.Header.Get("Content-Type"); ct != "image/png" {
+		t.Errorf("content type %q", ct)
+	}
+}
+
+func (e *env) post(path, contentType, body string) *http.Response {
+	e.t.Helper()
+	resp, err := http.Post(e.srv.URL+path, contentType, strings.NewReader(body))
+	if err != nil {
+		e.t.Fatal(err)
+	}
+	e.t.Cleanup(func() { resp.Body.Close() })
+	return resp
+}
+
+func TestFailureRulesAPI(t *testing.T) {
+	e := newEnv(t, nil)
+	resp := e.post("/api/v1/smtp/failures", "application/json", `{"stage":"rcpt","code":550,"address":"ana@example.com","count":2}`)
+	if resp.StatusCode != http.StatusCreated {
+		t.Fatalf("add: %d", resp.StatusCode)
+	}
+	var rule map[string]any
+	_ = json.NewDecoder(resp.Body).Decode(&rule)
+	if rule["stage"] != "rcpt" || rule["code"] != float64(550) || rule["remaining"] != float64(2) || rule["id"] == "" {
+		t.Fatalf("rule = %v", rule)
+	}
+
+	for body, status := range map[string]int{
+		`{"code":200}`:                400,
+		`{"stage":"helo"}`:            400,
+		`{"message":"a\r\nb"}`:        400,
+		`{"unknown":true}`:            400,
+		`not json`:                    400,
+		`{"address":"b@x","count":1}`: 201,
+	} {
+		if resp := e.post("/api/v1/smtp/failures", "application/json", body); resp.StatusCode != status {
+			t.Errorf("%s: status %d, want %d", body, resp.StatusCode, status)
+		}
+	}
+	if resp := e.post("/api/v1/smtp/failures", "text/plain", `{}`); resp.StatusCode != http.StatusUnsupportedMediaType {
+		t.Errorf("text/plain: status %d", resp.StatusCode)
+	}
+
+	var list struct {
+		Failures []map[string]any `json:"failures"`
+	}
+	e.json("GET", "/api/v1/smtp/failures", 200, &list)
+	if len(list.Failures) != 2 {
+		t.Fatalf("list = %v", list)
+	}
+	var deleted map[string]int
+	e.json("DELETE", "/api/v1/smtp/failures?address=ANA@example.com", 200, &deleted)
+	if deleted["deleted"] != 1 {
+		t.Fatalf("deleted = %v", deleted)
+	}
+	id := fmt.Sprint(list.Failures[1]["id"])
+	e.json("DELETE", "/api/v1/smtp/failures/"+id, 204, nil)
+	e.json("DELETE", "/api/v1/smtp/failures/"+id, 404, nil)
+}
