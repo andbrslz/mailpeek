@@ -1,0 +1,28 @@
+version: "2"
+
+linters:
+  enable:
+    - bodyclose
+    - misspell
+    - unconvert
+    - usestdlibvars
+    - gocritic
+  settings:
+    errcheck:
+      exclude-functions:
+        - fmt.Fprint
+        - fmt.Fprintf
+        - fmt.Fprintln
+        - (io.Closer).Close
+        - (net.Conn).Close
+        - (net.Listener).Close
+  exclusions:
+    presets:
+      - std-error-handling
+    rules:
+      - path: _test\.go
+        linters: [errcheck, bodyclose]
+
+formatters:
+  enable:
+    - gofmt

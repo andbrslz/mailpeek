@@ -1,0 +1,22 @@
+# Build and run Mailpeek from this checkout: docker compose up --build
+# (To use the published image instead: image: mailpeek/mailpeek)
+#
+# Defaults are 1026/8026, so Mailpit or MailHog (1025/8025) can run alongside.
+# Other ports:
+#   MAILPEEK_SMTP_PORT=1027 MAILPEEK_HTTP_PORT=8027 docker compose up -d
+# The same port is used inside and outside the container, so the Web UI
+# shows the address your application should actually use.
+services:
+  mailpeek:
+    image: mailpeek
+    build: .
+    ports:
+      - "${MAILPEEK_SMTP_PORT:-1026}:${MAILPEEK_SMTP_PORT:-1026}" # SMTP
+      - "${MAILPEEK_HTTP_PORT:-8026}:${MAILPEEK_HTTP_PORT:-8026}" # Web UI + API
+    environment:
+      MAILPEEK_SMTP_PORT: ${MAILPEEK_SMTP_PORT:-1026}
+      MAILPEEK_HTTP_PORT: ${MAILPEEK_HTTP_PORT:-8026}
+      MAILPEEK_MAX_MESSAGES: ${MAILPEEK_MAX_MESSAGES:-100}
+      # Optional logins, e.g. MAILPEEK_SMTP_AUTH=app:secret (empty = off)
+      MAILPEEK_SMTP_AUTH: ${MAILPEEK_SMTP_AUTH:-}
+      MAILPEEK_UI_AUTH: ${MAILPEEK_UI_AUTH:-}
