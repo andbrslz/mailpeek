@@ -43,6 +43,8 @@ type Server struct {
 	mux      *http.ServeMux
 	patterns []string
 	failures *failures.Set
+
+	localHostsOnly bool
 }
 
 //go:embed openapi.json
@@ -91,6 +93,9 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	h := w.Header()
 	h.Set("X-Content-Type-Options", "nosniff")
 	h.Set("Referrer-Policy", "same-origin")
+	if !s.hostAllowed(w, r) {
+		return
+	}
 	if s.auth != nil && !s.guard(w, r) {
 		return
 	}

@@ -68,19 +68,24 @@ func New(cfg config.Config, ui fs.FS, version string, logger *log.Logger) *App {
 		uiAuth = cfg.UIAuth.Match
 	}
 
+	handler := api.New(st, broker, ui, api.Info{
+		Version:        version,
+		SMTPPort:       cfg.SMTPPort,
+		HTTPPort:       cfg.HTTPPort,
+		MaxMessages:    cfg.MaxMessages,
+		MaxMessageSize: cfg.MaxMessageSize,
+		MaxStoreSize:   cfg.MaxStoreSize,
+		SMTPAuth:       cfg.SMTPAuth.Enabled(),
+		SMTPTLS:        cfg.SMTPTLS,
+	}, uiAuth).WithFailures(a.failures)
+	if loopback(cfg.Host) {
+		handler.WithLocalHostsOnly()
+	}
+
 	base, cancel := context.WithCancel(context.Background())
 	a.cancelBase = cancel
 	a.http = &http.Server{
-		Handler: api.New(st, broker, ui, api.Info{
-			Version:        version,
-			SMTPPort:       cfg.SMTPPort,
-			HTTPPort:       cfg.HTTPPort,
-			MaxMessages:    cfg.MaxMessages,
-			MaxMessageSize: cfg.MaxMessageSize,
-			MaxStoreSize:   cfg.MaxStoreSize,
-			SMTPAuth:       cfg.SMTPAuth.Enabled(),
-			SMTPTLS:        cfg.SMTPTLS,
-		}, uiAuth).WithFailures(a.failures),
+		Handler:           handler,
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       30 * time.Second,
 		WriteTimeout:      30 * time.Second,

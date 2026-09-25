@@ -41,6 +41,7 @@ ls -l mailpeek
 | MemoryStore Save (store at capacity, evicting) | ~150 ns/op |
 | MemoryStore List (100 messages, no filter) | ~0.9 µs/op |
 | Filter (100 messages, `to` + `subject`) | ~4.5 µs/op |
+| Body search (100 messages of ~200 KB text + HTML, `q` with no match) | ~18 ms/op, 0 allocs |
 | Event dispatch (10 subscribers) | ~0.7 µs/op, 0 allocs |
 
 Nothing has been optimized yet. These are baselines to compare future changes against.

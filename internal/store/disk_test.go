@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/andbrslz/mailpeek/internal/mail"
@@ -133,5 +135,60 @@ func TestPersistRejectsUnusableDir(t *testing.T) {
 	}
 	if _, err := New(10, nil).Persist(file, func(error) {}); err == nil {
 		t.Fatal("expected an error for a data dir that is a file")
+	}
+}
+
+func TestPersistRemovesUnfinishedWrites(t *testing.T) {
+	dir := t.TempDir()
+	s := persisted(t, 10, dir)
+	kept, raw := parsed("kept")
+	s.Save(kept, raw)
+	for name, data := range map[string]string{
+		"0123456789abcdef.eml":      "From: a@b\r\n\r\nno metadata",
+		"0123456789abcdef.eml.tmp":  "partial",
+		"fedcba9876543210.json.tmp": "{",
+		"notes.eml":                 "not written by Mailpeek",
+		"notes.tmp":                 "not written by Mailpeek",
+	} {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(data), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	again := persisted(t, 10, dir)
+	if got := ids(again.List(Filter{})); fmt.Sprint(got) != fmt.Sprint([]string{kept.ID}) {
+		t.Fatalf("reloaded ids = %v", got)
+	}
+	want := []string{kept.ID + ".eml", kept.ID + ".json", "notes.eml", "notes.tmp"}
+	got := files(t, dir)
+	slices.Sort(want)
+	if fmt.Sprint(got) != fmt.Sprint(want) {
+		t.Fatalf("files = %v, want %v", got, want)
+	}
+}
+
+func TestPersistKeepsDiskInStepWithConcurrentChanges(t *testing.T) {
+	dir := t.TempDir()
+	s := persisted(t, 1000, dir)
+	var wg sync.WaitGroup
+	for i := range 50 {
+		wg.Go(func() {
+			m, raw := parsed(fmt.Sprint("m", i))
+			s.Save(m, raw)
+			if i%2 == 0 {
+				s.Delete(m.ID)
+			}
+		})
+		wg.Go(func() { s.List(Filter{Query: "hello"}) })
+	}
+	wg.Wait()
+
+	var want []string
+	for _, m := range s.List(Filter{}) {
+		want = append(want, m.ID+".eml", m.ID+".json")
+	}
+	slices.Sort(want)
+	if got := files(t, dir); len(want) != 50 || fmt.Sprint(got) != fmt.Sprint(want) {
+		t.Fatalf("files = %d, messages = %d", len(got), len(want)/2)
 	}
 }
