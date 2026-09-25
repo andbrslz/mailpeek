@@ -50,3 +50,14 @@ func TestListenLocalhostIsNotReachableFromOtherInterfaces(t *testing.T) {
 		t.Fatalf("bound to %s, want a loopback address", ip)
 	}
 }
+
+func TestLoopback(t *testing.T) {
+	for host, want := range map[string]bool{
+		"": true, "localhost": true, "127.0.0.1": true, "127.0.0.2": true, "::1": true,
+		"0.0.0.0": false, "::": false, "192.168.1.20": false, "mailpeek": false,
+	} {
+		if got := loopback(host); got != want {
+			t.Errorf("loopback(%q) = %v, want %v", host, got, want)
+		}
+	}
+}

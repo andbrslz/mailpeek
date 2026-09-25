@@ -8,8 +8,10 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/andbrslz/mailpeek/internal/mail"
@@ -23,6 +25,36 @@ type meta struct {
 type disk struct {
 	dir     string
 	onError func(error)
+
+	mu      sync.Mutex
+	turn    sync.Cond
+	next    uint64
+	serving uint64
+}
+
+func newDisk(dir string, onError func(error)) *disk {
+	d := &disk{dir: dir, onError: onError}
+	d.turn.L = &d.mu
+	return d
+}
+
+func (d *disk) schedule(op func()) func() {
+	d.mu.Lock()
+	ticket := d.next
+	d.next++
+	d.mu.Unlock()
+	return func() {
+		d.mu.Lock()
+		for d.serving != ticket {
+			d.turn.Wait()
+		}
+		d.mu.Unlock()
+		op()
+		d.mu.Lock()
+		d.serving++
+		d.turn.Broadcast()
+		d.mu.Unlock()
+	}
 }
 
 func (d *disk) write(m *mail.Message, raw []byte) {
@@ -89,8 +121,10 @@ func (s *MemoryStore) Persist(dir string, onError func(error)) (int, error) {
 		return cmp.Or(a.meta.CreatedAt.Compare(b.meta.CreatedAt), strings.Compare(a.id, b.id))
 	})
 
+	removeOrphans(dir, onError)
+
 	s.mu.Lock()
-	s.disk = &disk{dir: dir, onError: onError}
+	s.disk = newDisk(dir, onError)
 	s.mu.Unlock()
 	for _, e := range list {
 		m := mail.Parse(e.raw, e.meta.Envelope)
@@ -122,4 +156,31 @@ func readStored(path string) (stored, error) {
 		m.Envelope.To = []string{}
 	}
 	return stored{id: id, meta: m, raw: raw}, nil
+}
+
+var storedName = regexp.MustCompile(`^[0-9a-f]{16}\.(eml|json)(\.tmp)?$`)
+
+func removeOrphans(dir string, onError func(error)) {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		onError(fmt.Errorf("data dir: %w", err))
+		return
+	}
+	names := map[string]bool{}
+	for _, e := range entries {
+		names[e.Name()] = true
+	}
+	for name := range names {
+		if !storedName.MatchString(name) {
+			continue
+		}
+		orphan := strings.HasSuffix(name, ".tmp") ||
+			strings.HasSuffix(name, ".eml") && !names[strings.TrimSuffix(name, ".eml")+".json"]
+		if !orphan {
+			continue
+		}
+		if err := os.Remove(filepath.Join(dir, name)); err != nil && !errors.Is(err, fs.ErrNotExist) {
+			onError(fmt.Errorf("removing unfinished file %s: %w", name, err))
+		}
+	}
 }

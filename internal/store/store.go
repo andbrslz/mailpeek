@@ -75,13 +75,14 @@ func (s *MemoryStore) save(m *mail.Message, raw []byte, persist bool) {
 		s.order = slices.Delete(s.order, 0, 1)
 	}
 	s.evicted += int64(len(evicted))
-	if s.disk != nil {
+	flush := s.onDisk(func(d *disk) {
 		if persist {
-			s.disk.write(m, raw)
+			d.write(m, raw)
 		}
-		s.disk.remove(evicted)
-	}
+		d.remove(evicted)
+	})
 	s.mu.Unlock()
+	flush()
 
 	for _, id := range evicted {
 		s.publish(events.Event{Type: events.MessageDeleted, ID: id})
@@ -179,15 +180,15 @@ func (s *MemoryStore) Len() int {
 func (s *MemoryStore) Delete(id string) bool {
 	s.mu.Lock()
 	e, ok := s.items[id]
+	flush := func() {}
 	if ok {
 		s.bytes -= e.size
 		delete(s.items, id)
 		s.order = slices.DeleteFunc(s.order, func(v string) bool { return v == id })
-		if s.disk != nil {
-			s.disk.remove([]string{id})
-		}
+		flush = s.onDisk(func(d *disk) { d.remove([]string{id}) })
 	}
 	s.mu.Unlock()
+	flush()
 
 	if ok {
 		s.publish(events.Event{Type: events.MessageDeleted, ID: id})
@@ -214,10 +215,9 @@ func (s *MemoryStore) DeleteMatching(f Filter) int {
 			return false
 		})
 	}
-	if s.disk != nil {
-		s.disk.remove(removed)
-	}
+	flush := s.onDisk(func(d *disk) { d.remove(removed) })
 	s.mu.Unlock()
+	flush()
 
 	if f.IsZero() {
 		s.publish(events.Event{Type: events.MessagesCleared})
@@ -227,6 +227,14 @@ func (s *MemoryStore) DeleteMatching(f Filter) int {
 		s.publish(events.Event{Type: events.MessageDeleted, ID: id})
 	}
 	return len(removed)
+}
+
+func (s *MemoryStore) onDisk(op func(d *disk)) func() {
+	if s.disk == nil {
+		return func() {}
+	}
+	d := s.disk
+	return d.schedule(func() { op(d) })
 }
 
 func (s *MemoryStore) publish(e events.Event) {

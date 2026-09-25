@@ -15,6 +15,14 @@ func listen(host string, port int) (net.Listener, error) {
 	return net.Listen("tcp", net.JoinHostPort(host, strconv.Itoa(port)))
 }
 
+func loopback(host string) bool {
+	if host == "" || host == "localhost" {
+		return true
+	}
+	ip := net.ParseIP(host)
+	return ip != nil && ip.IsLoopback()
+}
+
 func listenLoopback(port int) (net.Listener, error) {
 	for attempt := 0; ; attempt++ {
 		v4, err := net.Listen("tcp4", net.JoinHostPort("127.0.0.1", strconv.Itoa(port)))

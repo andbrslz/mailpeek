@@ -43,6 +43,8 @@ jobs:
         run: npm run lint
       - name: UI files at most 300 lines
         run: npm run ui:size
+      - name: UI translations complete
+        run: npm run ui:i18n
       - name: Build
         run: npm run build
       - name: Typecheck

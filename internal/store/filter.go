@@ -3,6 +3,8 @@ package store
 import (
 	"strings"
 	"time"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/andbrslz/mailpeek/internal/mail"
 )
@@ -93,7 +95,55 @@ func matchAddress(a mail.Address, needle string) bool {
 }
 
 func contains(s, lowerNeedle string) bool {
-	return strings.Contains(strings.ToLower(s), lowerNeedle)
+	if lowerNeedle == "" {
+		return true
+	}
+	first := lowerNeedle[0]
+	for i := 0; i < len(s); {
+		if c := s[i]; c < utf8.RuneSelf {
+			if lowerASCII(c) == first && hasLowerPrefix(s[i:], lowerNeedle) {
+				return true
+			}
+			i++
+			continue
+		}
+		if hasLowerPrefix(s[i:], lowerNeedle) {
+			return true
+		}
+		_, n := utf8.DecodeRuneInString(s[i:])
+		i += n
+	}
+	return false
+}
+
+func lowerASCII(c byte) byte {
+	if 'A' <= c && c <= 'Z' {
+		return c + 'a' - 'A'
+	}
+	return c
+}
+
+func hasLowerPrefix(s, prefix string) bool {
+	var buf [utf8.UTFMax]byte
+	for prefix != "" {
+		if s == "" {
+			return false
+		}
+		if c := s[0]; c < utf8.RuneSelf {
+			if lowerASCII(c) != prefix[0] {
+				return false
+			}
+			s, prefix = s[1:], prefix[1:]
+			continue
+		}
+		r, n := utf8.DecodeRuneInString(s)
+		m := utf8.EncodeRune(buf[:], unicode.ToLower(r))
+		if len(prefix) < m || prefix[:m] != string(buf[:m]) {
+			return false
+		}
+		s, prefix = s[n:], prefix[m:]
+	}
+	return true
 }
 
 func lower(s string) string { return strings.ToLower(strings.TrimSpace(s)) }

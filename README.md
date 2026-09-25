@@ -472,7 +472,7 @@ Zero config by default. CLI flags take precedence over environment variables.
 mailpeek --smtp-port 1026 --http-port 8026 --max-messages 1000
 ```
 
-The binary only accepts connections from this machine (`127.0.0.1` and `::1`), so captured emails stay private on shared networks. Use `--host 0.0.0.0` when other machines, or an application in a container, must reach a Mailpeek running outside Docker. The Docker image already listens on all interfaces, which the container needs.
+The binary only accepts connections from this machine (`127.0.0.1` and `::1`), so captured emails stay private on shared networks. Use `--host 0.0.0.0` when other machines, or an application in a container, must reach a Mailpeek running outside Docker. The Docker image already listens on all interfaces, which the container needs. While Mailpeek listens on this machine only, open it as `localhost`, `127.0.0.1` or a name ending in `.localhost` (such as `mail.localhost`); other host names get `403` (see [Security](#security)).
 
 In Docker, the published port and the container port should be the same (`-e MAILPEEK_SMTP_PORT=1027 -p 1027:1027`); see [Other ports](#other-ports).
 
@@ -610,6 +610,7 @@ Mailpeek is a development tool: do not expose it to the internet. Authentication
 - **No relay.** Every recipient is accepted, and nothing is ever delivered or forwarded.
 - **HTML never runs.** Previews render in an `<iframe sandbox>` without `allow-scripts` or `allow-same-origin`, under a Content-Security-Policy that only allows Mailpeek's own scripts. Links found in emails are never fetched.
 - **Local by default.** The binary listens on `127.0.0.1` and `::1` only, so other machines on the network cannot read captured emails unless you pass `--host 0.0.0.0` (the Docker image does, inside the container).
+- **DNS rebinding blocked.** While it listens on this machine only, the Web UI and API answer only to `localhost`, names ending in `.localhost` and IP addresses. A web page that points its own domain at `127.0.0.1` gets `403` instead of your emails.
 - **Safe attachments.** Downloads use `Content-Disposition: attachment` with a sanitized filename, `X-Content-Type-Options: nosniff` and `Content-Security-Policy: sandbox`. Only PNG, JPEG, GIF, WebP, AVIF and BMP images can be opened in the browser (never SVG or HTML). Attachments are looked up by ID in memory, never by a path taken from the request, so there is no path traversal.
 - **Limits.** Maximum message size (`SIZE` is advertised and enforced), a total memory budget for stored messages (`--max-store-size`), at most 100 simultaneous SMTP connections (more get `421`), bounded concurrent MIME parsing, 100 recipients per message, bounded SMTP line length, idle/data/write timeouts on SMTP, header/read/write/idle timeouts and a 64 KB header limit on HTTP, and disconnection after repeated protocol errors.
 - **Graceful shutdown** on `SIGINT`/`SIGTERM`: SMTP stops accepting and finishes in-flight messages, SSE streams and pending wait requests end, and HTTP drains.

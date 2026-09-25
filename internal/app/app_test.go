@@ -353,3 +353,24 @@ func TestSimulatedSMTPFailures(t *testing.T) {
 		}
 	}
 }
+
+func TestLoopbackRefusesOtherHostNames(t *testing.T) {
+	a, _, base := startApp(t)
+	defer a.Shutdown(context.Background())
+	status := func(host string) int {
+		req, _ := http.NewRequest(http.MethodGet, base+"/api/v1/messages", nil)
+		req.Host = host
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+		return resp.StatusCode
+	}
+	if got := status("localhost:8026"); got != http.StatusOK {
+		t.Fatalf("localhost: status %d", got)
+	}
+	if got := status("rebound.example:8026"); got != http.StatusForbidden {
+		t.Fatalf("rebound host name: status %d", got)
+	}
+}
